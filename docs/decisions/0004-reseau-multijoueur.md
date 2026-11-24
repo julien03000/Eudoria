@@ -1,6 +1,6 @@
 # ADR-0004 — Solution réseau multijoueur
 
-- **Statut :** Proposé
+- **Statut :** Accepté (validé par le porteur de projet le 2026-11-24)
 - **Date :** 2026-11-24 (révision 2 — adaptée à Unreal Engine, voir ADR-0003)
 - **Liée à :** ADR-0001 (backend), ADR-0003 (moteur client), ADR-0005 (fichiers binaires)
 

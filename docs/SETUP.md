@@ -40,8 +40,8 @@ Légende de fiabilité des tailles : **mesuré** (sur ce PC) · **officiel** (do
 | Outil | Rôle | Taille | Sur C: (forcé) | Sur E: |
 |---|---|---|---|---|
 | **Visual Studio 2026 Community** (18.0 ou plus) | Compiler le C++ d'Unreal ; aussi le SDK .NET 10 du noyau | 20 à 50 Go pour une installation typique (officiel, fourchette globale) ; **~25 à 35 Go** pour les composants ci-dessous (estimé) | **~8 à 12 Go** (estimé) | le reste |
-| **Docker Desktop** | Lancer PostgreSQL en local (ADR-0002) | ~3 Go de programme (estimé) + images et données | ~3 Go (programme, estimé) | Données/images (le disque virtuel est déplaçable vers E: dans les réglages) |
-| **Total étape 1** | | **~30 à 40 Go** (estimé) | **~11 à 15 Go** | **~20 à 25 Go** |
+| **Docker Desktop** | Lancer PostgreSQL en local (ADR-0002) | ~3 Go de programme (estimé) + images et données | < 1 Go (estimé) | Programme et données (options `--installation-dir` et `--wsl-default-data-root`) |
+| **Total étape 1** | | **~25 à 35 Go** (estimé) | **~9 à 13 Go** | **~19 à 29 Go** |
 
 **Visual Studio — version et composants exigés par UE 5.8** ([configuration Visual Studio pour Unreal](https://dev.epicgames.com/documentation/en-us/unreal-engine/setting-up-visual-studio-development-environment-for-cplusplus-projects-in-unreal-engine)) :
 - Version : VS 2022 17.14+ ou **VS 2026 18.0+** ; Epic recommande **VS 2026** pour le développement général.
@@ -80,16 +80,103 @@ affichée en bas de l'installateur.
 | Cache de données dérivées Unreal (DDC, Zen) | `%LOCALAPPDATA%\UnrealEngine\Common` | 1,9 Go (mesuré) — grossit avec les projets, souvent plusieurs dizaines de Go | Début d'étape 1 |
 | Cache de téléchargement Visual Studio | `C:\ProgramData\Microsoft\VisualStudio\Packages` | — | À l'installation de VS |
 | Disque virtuel Docker (WSL 2) | `%LOCALAPPDATA%\Docker` | — | À l'installation de Docker |
-| Bibliothèque Fab (assets téléchargés) | `%LOCALAPPDATA%\Temp\FabLibrary` | 6,1 Go (mesuré) | Dans les réglages du lanceur/Fab |
+| Bibliothèque Fab (assets téléchargés) | `%LOCALAPPDATA%\Temp\FabLibrary` | supprimée le 2026-11-24 (6,1 Go libérés) | Rediriger vers E: dans les réglages du lanceur/Fab avant de retélécharger des assets |
+
+## Plan d'installation — Visual Studio 2026 et Docker Desktop (en attente de validation)
+
+### Arborescence proposée sur E:
+```
+E:\Dev\
+├── VisualStudio\
+│   ├── 2026\Community\   # l'IDE
+│   ├── Shared\           # composants partagés, outils, SDK déplaçables
+│   └── Cache\            # cache de téléchargement
+└── Docker\
+    ├── Program\          # programme Docker Desktop
+    └── Data\             # disque virtuel WSL de Docker (images, conteneurs, données PostgreSQL)
+```
+
+### Visual Studio 2026 Community
+
+**Méthode :** la liste des composants est enregistrée dans un fichier texte versionné
+`tools/vs/eudoria.vsconfig` (créé au moment de l'installation), puis l'installateur officiel est lancé
+en ligne de commande avec les emplacements sur E: :
+```
+vs_community.exe --installPath "E:\Dev\VisualStudio\2026\Community"
+                 --path shared="E:\Dev\VisualStudio\Shared"
+                 --path cache="E:\Dev\VisualStudio\Cache"
+                 --config "<dépôt>\tools\vs\eudoria.vsconfig" --passive --norestart
+```
+(Programme d'installation officiel : https://aka.ms/vs/stable/vs_community.exe — droits administrateur
+requis. Les emplacements `shared` et `cache` ne peuvent être choisis **qu'à la première installation**.)
+
+**Composants** (identifiants officiels VS 2026, [liste Microsoft](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-community)) :
+
+| Identifiant | Nom affiché | Pourquoi |
+|---|---|---|
+| `Microsoft.VisualStudio.Workload.NativeDesktop` | Développement Desktop en C++ | Exigé par Epic |
+| `Microsoft.VisualStudio.Workload.NativeGame` | Développement de jeux en C++ | Exigé par Epic |
+| `Microsoft.VisualStudio.Workload.ManagedDesktop` | Développement .NET Desktop | Exigé par Epic ; apporte le **SDK .NET 10** du noyau (ADR-0001) |
+| `Microsoft.VisualStudio.Component.VC.Tools.x86.x64` | MSVC Build Tools x64/x86 (dernière version) | Compilateur C++ |
+| `Microsoft.VisualStudio.Component.Windows11SDK.26100` | Windows 11 SDK (10.0.26100) | Version recommandée par Epic |
+| `Microsoft.VisualStudio.Component.VC.DiagnosticTools` | Outils de profilage C++ | Listé par Epic |
+| `Microsoft.VisualStudio.Component.VC.ASAN` | MSVC AddressSanitizer | Listé par Epic (détection d'erreurs mémoire) |
+| `Component.Unreal.Ide` | Visual Studio Tools for Unreal Engine | Aide à la navigation dans le code Unreal |
+
+**Volontairement exclus :**
+- `Component.Unreal` (« Unreal Engine installer ») : installe le lanceur Epic, **déjà présent**.
+- *.NET Multi-platform App UI development* (MAUI) : listé par Epic, mais très volumineux et sans usage prévu pour nous ; à ajouter seulement si une erreur de compilation le réclame.
+- `Component.Unreal.Debugger` (débogage des Blueprints) : nos Blueprints ne contiennent pas de logique.
+
+**Place estimée** (l'installateur affiche la répartition exacte avant de lancer ; à vérifier à ce moment-là) :
+
+| Où | Contenu | Estimation |
+|---|---|---|
+| **E:** | IDE, MSVC, outils, cache | ~15 à 25 Go |
+| **C: (forcé)** | Windows SDK (`C:\Program Files (x86)\Windows Kits`), SDK .NET (`C:\Program Files\dotnet`), runtimes C++/.NET, packs de ciblage .NET Framework, WebView2, programme d'installation de VS | **~8 à 12 Go** |
+| C: temporaire | Zones de travail pendant l'installation | quelques Go, libérés ensuite |
+
+### Docker Desktop
+
+**Prérequis vérifiés sur ce PC (2026-11-24) :**
+- Windows 11 Home : supporté avec le moteur WSL 2 (conteneurs Linux uniquement, ce qui nous suffit).
+- WSL **3.0.5** déjà installé (distribution Ubuntu existante, 3,5 Go sur C:) ; virtualisation activée.
+
+**Méthode :** installateur officiel en mode « tous les utilisateurs » (droits administrateur), avec les options
+documentées pour placer programme et données sur E: ([installation Windows](https://docs.docker.com/desktop/setup/install/windows-install/)) :
+```
+"Docker Desktop Installer.exe" install --backend=wsl-2
+     --installation-dir="E:\Dev\Docker\Program"
+     --wsl-default-data-root="E:\Dev\Docker\Data"
+```
+La licence Docker Desktop (gratuite pour un usage personnel et les petites structures) est à **accepter par toi** au premier lancement.
+
+**Réglage important avec 16 Go de RAM :** WSL 2 peut réserver jusqu'à la moitié de la mémoire du PC. Pour
+qu'Unreal garde assez de mémoire, créer `%USERPROFILE%\.wslconfig` avec une limite (ex. `memory=4GB`,
+largement suffisant pour PostgreSQL). À relever une fois à 32 Go.
+
+**Place estimée :**
+
+| Où | Contenu | Estimation |
+|---|---|---|
+| **E:** | Programme (~3 Go) + données (image PostgreSQL ~0,5 Go, grossit avec l'usage) | ~4 Go au départ |
+| **C:** | Configuration utilisateur, journaux, intégration WSL | **< 1 Go** |
+
+### Ordre proposé
+1. Visual Studio 2026 (redémarrage éventuel).
+2. Docker Desktop, puis `.wslconfig`.
+3. Vérifications : `dotnet --version` (10.x), compilation d'un projet C++ Unreal vide (dans le cadre de l'étape 1), `docker run hello-world`.
+4. Mise à jour de `CLAUDE.md` (section Environnement) avec les chemins réels.
 
 ## Bilan pour le disque C:
 
 | | Go |
 |---|---|
-| Libre aujourd'hui | ~50 |
-| Étape 1 (VS + Docker, part forcée) | − 11 à 15 (estimé) |
+| Libre aujourd'hui (après suppression de la bibliothèque Fab) | ~56 |
+| Visual Studio 2026 (part forcée) | − 8 à 12 (estimé) |
+| Docker Desktop (part sur C:) | − 1 (estimé) |
 | Marge pour Windows, mises à jour, zones de travail des installateurs | ≥ 15 conseillés |
-| **Reste après l'étape 1** | **~35 Go** — suffisant **si** les caches ci-dessus sont redirigés vers E: |
+| **Reste après ces installations** | **~43 à 47 Go** — confortable **si** les caches ci-dessus sont redirigés vers E: |
 
 Pour gagner de la place sur C: sans rien désinstaller d'utile : voir les traces de l'ancienne installation
 d'Unreal et le cache Fab listés dans `docs/PROGRESS.md` (à ta décision).

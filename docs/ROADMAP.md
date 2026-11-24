@@ -32,7 +32,8 @@ Légende : ⚪ À faire · 🟡 En cours · 🟢 Validée
 **Critères de validation :**
 - Le dépôt git existe sur `main`, avec `.gitignore` et `.gitattributes`.
 - `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md` existent.
-- Les 5 ADR (backend, base de données, moteur client, réseau, fichiers binaires) sont **validés** par le porteur de projet.
+- Les 5 ADR (backend, base de données, moteur client, réseau, fichiers binaires) sont **validés** par le porteur de projet. ✅ (2026-11-24)
+- L'ADR-0006 (hébergement du dépôt distant) est décidé et le dépôt est sauvegardé hors du PC.
 - `CLAUDE.md` est mis à jour (sections « Stack technique » et « Structure du dépôt »).
 - Les outils de `docs/SETUP.md` nécessaires à l'étape 1 sont installés (après validation des ADR).
 
@@ -122,7 +123,9 @@ convient pas, alternatives.
 ## Étape 3 — Premier environnement multijoueur
 
 **Objectif :** plusieurs personnes connectées se voient dans un même lieu.
-**Prérequis technique :** **compilation d'Unreal 5.8 depuis les sources** (obligatoire pour les serveurs dédiés, ADR-0004 ; ~150 à 350 Go sur E:, liaison des comptes Epic et GitHub).
+**Prérequis :**
+- **Passage du poste à 32 Go de RAM** (16 Go actuellement) : indispensable pour compiler le moteur dans de bonnes conditions (Epic recommande 32 Go).
+- **Compilation d'Unreal 5.8 depuis les sources** (obligatoire pour les serveurs dédiés, ADR-0004 ; ~150 à 350 Go sur E:, liaison des comptes Epic et GitHub).
 **Livrable :** un premier serveur dédié Unreal (une place simple, Windows en local) qui accepte les joueurs authentifiés par le noyau et affiche leurs avatars.
 **Validation :** deux clients PC rejoignent le même monde et voient l'avatar de l'autre ; un client sans jeton valide est refusé.
 

@@ -1,6 +1,6 @@
 # ADR-0003 — Moteur de jeu pour le client
 
-- **Statut :** Proposé
+- **Statut :** Accepté (validé par le porteur de projet le 2026-11-24)
 - **Date :** 2026-11-24 (révision 2 — remplace la proposition « Godot 4 » du même jour)
 - **Liée à :** ADR-0001 (backend), ADR-0004 (réseau), ADR-0005 (fichiers binaires)
 

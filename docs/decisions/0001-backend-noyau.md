@@ -1,6 +1,6 @@
 # ADR-0001 — Langage et framework du backend (le noyau)
 
-- **Statut :** Proposé
+- **Statut :** Accepté (validé par le porteur de projet le 2026-11-24)
 - **Date :** 2026-11-24 (révision 2 — réévaluée après le passage à Unreal Engine, ADR-0003)
 - **Liée à :** ADR-0002 (base de données), ADR-0003 (moteur client), ADR-0004 (réseau)
 

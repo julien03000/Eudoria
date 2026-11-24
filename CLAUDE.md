@@ -62,21 +62,57 @@ ce qui est fait, ce qui est en cours, les problèmes connus, et **la prochaine �
 - Penser multi-plateforme (PC, VR, mobile) dès la conception, même si on ne développe que PC au début.
 
 ## Stack technique
-À définir — voir `docs/decisions/`. Mets à jour cette section quand un ADR est validé.
+Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
+- **Noyau (backend)** : C# / ASP.NET Core sur **.NET 10 LTS**, monolithe modulaire ; contrats d'API en
+  **OpenAPI** écrits avant le code (`shared/api/`) — ADR-0001.
+- **Base de données** : **PostgreSQL**, migrations versionnées ; en local via Docker — ADR-0002.
+- **Client** : **Unreal Engine 5.8.x** — ADR-0003. Règles impératives :
+  - toute la logique en **C++** ;
+  - Blueprints uniquement comme classes enfants de classes C++, pour assigner assets et réglages (aucune logique dans les graphes) ;
+  - automatisation de l'éditeur par **scripts Python** quand c'est possible ;
+  - réglages en texte (`Config/*.ini`) ; qualité par plateforme (PC photoréaliste, VR et mobile allégés).
+- **Réseau** : réplication native Unreal + **serveurs dédiés** ; un monde = un plugin **Game Feature** qui ne
+  dépend que du plugin socle `EudoriaCore` ; moteur compilé depuis les sources à partir de l'étape 3 — ADR-0004.
+- **Fichiers binaires** : **Git LFS** avec verrouillage (`.uasset`, `.umap` verrouillables) — ADR-0005.
+- **Hébergement du dépôt distant** : à décider — ADR-0006 (Proposé).
 
 ## Environnement
 - **Règle d'installation : tout sur E:.** Le disque C: n'a qu'environ 50 Go libres ; seuls les composants
-  qui l'exigent y vont (Visual Studio en installe une partie de force, estimée à 8–12 Go).
+  qui l'exigent y vont (Visual Studio en installe une partie de force, estimée à 8–12 Go ; Docker < 1 Go).
   Les caches (Unreal DDC/Zen, Docker, Fab, SDK Android) doivent être redirigés vers E:.
   Ne rien installer sans mon accord. Détail des outils et tailles : `docs/SETUP.md`.
 - **Unreal Engine 5.8.4** (version du lanceur Epic) : `E:\Epic Games\UE_5.8`
   - Éditeur : `E:\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe`
   - Python de l'éditeur : `E:\Epic Games\UE_5.8\Engine\Binaries\ThirdParty\Python3\Win64\python.exe`
 - **Git 2.56.1** (+ Git LFS 3.8.1) : `C:\Program Files\Git\cmd\git.exe` (peut être absent du PATH des sessions déjà ouvertes).
-- Poste : Windows 11, Ryzen 9 3900X (12 cœurs), **16 Go de RAM** (Epic en recommande 32), Radeon RX 9060 XT.
+- Poste : Windows 11, Ryzen 9 3900X (12 cœurs / 24 threads), **16 Go de RAM** (Epic en recommande 32 ;
+  passage à 32 Go prévu, prérequis de l'étape 3), Radeon RX 9060 XT.
+- **Tant que le poste a 16 Go de RAM : limiter les compilations parallèles d'Unreal Build Tool** pour éviter
+  les plantages par manque de mémoire. Dans `%APPDATA%\Unreal Engine\UnrealBuildTool\BuildConfiguration.xml` :
+  `MaxParallelActions` (ex. 6 au lieu de 24 automatiques) et `ParallelExecutor/MemoryPerActionBytes`.
+  ⚠️ Epic indique que `MaxParallelActions` s'applique aux exécuteurs Parallel/Hybrid/Local, sans mentionner
+  l'Unreal Build Accelerator (UBA, exécuteur local par défaut) : à la première compilation (étape 1), vérifier
+  dans le journal d'UBT le nombre de tâches réellement lancées ; si la limite est ignorée, désactiver l'UBA
+  local (`bAllowUBALocalExecutor` = false). Retirer ces limites une fois à 32 Go.
 
 ## Structure du dépôt
-À définir en Phase 0. Mets à jour cette section quand elle est validée.
+Validée le 2026-11-24 (monorepo). Le détail interne de chaque dossier est défini à l'étape qui le crée.
+```
+eudoria/
+├── docs/                    # vision, roadmap, architecture, ADR (decisions/), progrès, installation (SETUP.md)
+├── core/                    # le noyau (C# / ASP.NET Core)
+├── shared/
+│   └── api/                 # contrats OpenAPI du noyau (public + interne), en YAML
+├── unreal/                  # le projet Unreal (client + serveurs de monde)
+│   ├── Source/              # code C++ du module principal
+│   ├── Plugins/
+│   │   ├── EudoriaCore/     # plugin socle (C++)
+│   │   └── GameFeatures/    # un plugin par monde (World_<Nom>)
+│   ├── Config/              # réglages en texte (.ini), profils de qualité par plateforme
+│   ├── Content/             # assets binaires (Git LFS)
+│   └── Scripts/             # scripts Python d'automatisation de l'éditeur
+└── tools/                   # scripts de dev, environnement local (Docker Compose…)
+```
 
 ## Langue
 - Échanges avec moi et documentation : **français**.

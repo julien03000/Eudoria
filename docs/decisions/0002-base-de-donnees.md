@@ -1,6 +1,6 @@
 # ADR-0002 — Base de données principale
 
-- **Statut :** Proposé
+- **Statut :** Accepté (validé par le porteur de projet le 2026-11-24)
 - **Date :** 2026-11-24
 - **Liée à :** ADR-0001 (backend)
 
