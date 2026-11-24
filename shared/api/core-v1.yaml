@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: EUDORIA Core — Public API
-  version: 1.2.0
+  version: 1.3.0
   description: |
     Public API of the EUDORIA core (clients). Contract-first: this file is written
     before the code and the core is tested against it (ADR-0001).
@@ -20,6 +20,11 @@ tags:
       valid 15 minutes, audience "eudoria-core": it is accepted by the core API only (world
       servers will get their own short-lived entry tickets, sub-step 1.6). The refresh token is
       an opaque random value, stored server-side (hashed) and revocable; it is rotated on every use.
+
+      Limits (sub-step 1.4): failed logins are counted per e-mail and client address, and per
+      e-mail alone; past the limit, attempts are refused for a while (429 with Retry-After), even
+      with the right password. Each authentication route also has a request rate limit per client
+      address (IPv4 address, or IPv6 /64 prefix). The values are server settings, not part of the contract.
 paths:
   /health/live:
     get:
@@ -80,7 +85,9 @@ paths:
         - pseudo: 3 to 20 characters among A-Z, a-z, 0-9, '_' and '-', starting with a letter;
           unique regardless of letter case.
         - password: normalized to Unicode NFKC first, then 12 to 128 characters (Unicode code points);
-          every character is allowed, no composition rule.
+          every character is allowed, no composition rule. Refused (password_too_common) when it is a
+          commonly used password (list of leaked passwords, letter case ignored), or when it contains
+          the pseudo, the part of the e-mail before '@', or "eudoria" (for words of 4 characters or more).
       requestBody:
         required: true
         content:
@@ -130,6 +137,10 @@ paths:
                 errors:
                   - field: pseudo
                     code: pseudo_taken
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServerBusy'
   /auth/login:
     post:
       tags: [auth]
@@ -139,7 +150,8 @@ paths:
         The e-mail is normalized as at registration (trimmed, lower-cased) and the password is
         normalized to Unicode NFKC. An unknown e-mail and a wrong password get exactly the same
         401 response (comparable duration), so this route does not reveal whether an e-mail has
-        an account. No limit on attempts yet (sub-step 1.4).
+        an account. Failed attempts are limited (see the "auth" tag): a blocked attempt gets 429
+        without the password being checked, and the same 429 whether the e-mail has an account or not.
       requestBody:
         required: true
         content:
@@ -185,6 +197,10 @@ paths:
                 errors:
                   - field: credentials
                     code: invalid_credentials
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServerBusy'
   /auth/refresh:
     post:
       tags: [auth]
@@ -231,6 +247,8 @@ paths:
                 errors:
                   - field: refreshToken
                     code: refresh_token_invalid
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/logout:
     post:
       tags: [auth]
@@ -239,7 +257,8 @@ paths:
       description: |
         Revokes the session (refresh token family) the token belongs to. Always answers 204,
         even for an unknown or already revoked token. Access tokens already issued stay valid
-        until they expire (at most 15 minutes); clients simply forget them.
+        until they expire (at most 15 minutes); clients simply forget them. To cut every session
+        and every access token at once, use /me/sessions/revoke-all.
       requestBody:
         required: true
         content:
@@ -278,11 +297,102 @@ paths:
         '401':
           description: |
             Missing, expired, malformed or forged access token, or a token meant for another
-            audience. No body; the WWW-Authenticate header says "Bearer".
+            audience, or a token issued before a password change or a "revoke-all". No body; the
+            WWW-Authenticate header says "Bearer".
           headers:
             WWW-Authenticate:
               schema:
                 type: string
+  /me/password:
+    post:
+      tags: [accounts]
+      operationId: changeMyPassword
+      summary: Changes the caller's password and signs out every other device.
+      description: |
+        Requires the current password. The new password follows the registration rules
+        (NFKC, 12 to 128 code points, not a common password, not containing the pseudo, the
+        part of the e-mail before '@' or "eudoria") and must differ from the current one.
+
+        On success, every session of the account is revoked and every access token issued before
+        is refused from now on; a new session is opened for the caller, whose tokens are returned.
+        Wrong current passwords are limited like logins (per account and client address).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+            example:
+              currentPassword: a-long-enough-passphrase
+              newPassword: another-long-passphrase-2026
+      responses:
+        '200':
+          description: Password changed; tokens of the new session (the only one left).
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '400':
+          description: The body is unreadable, or the new password is refused.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                errors:
+                  - field: newPassword
+                    code: password_too_common
+        '401':
+          description: |
+            Wrong current password (invalid_credentials on currentPassword). A missing, expired,
+            forged or revoked access token also gets 401, without a body (WWW-Authenticate: Bearer).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                errors:
+                  - field: currentPassword
+                    code: invalid_credentials
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServerBusy'
+  /me/sessions/revoke-all:
+    post:
+      tags: [accounts]
+      operationId: revokeAllMySessions
+      summary: Signs out every device, this one included.
+      description: |
+        Revokes every session (refresh token) of the account, and every access token issued so
+        far is refused from now on, this one included. No password is asked: the worst case is
+        having to log in again.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Every device is signed out.
+        '401':
+          description: |
+            Missing, expired, malformed, forged or revoked access token. No body; the
+            WWW-Authenticate header says "Bearer".
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 components:
   securitySchemes:
     bearerAuth:
@@ -296,6 +406,48 @@ components:
       schema:
         type: string
         enum: [no-store]
+    RetryAfter:
+      description: Number of seconds to wait before trying again (RFC 9110).
+      schema:
+        type: string
+        pattern: '^[0-9]+$'
+  responses:
+    TooManyRequests:
+      description: |
+        Too many attempts or requests: try again after the number of seconds given by Retry-After.
+        Same answer whether the e-mail (or account) exists or not.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Too Many Requests
+            status: 429
+            errors:
+              - field: request
+                code: too_many_attempts
+    ServerBusy:
+      description: |
+        The core is momentarily too busy checking passwords (protection against overload):
+        try again after the number of seconds given by Retry-After.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Service Unavailable
+            status: 503
+            errors:
+              - field: request
+                code: server_busy
   schemas:
     RegisterAccountRequest:
       type: object
@@ -332,6 +484,18 @@ components:
           type: string
         password:
           type: string
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: Counted in Unicode code points after NFKC normalization.
     RefreshTokenRequest:
       type: object
       additionalProperties: false
@@ -398,8 +562,10 @@ components:
       properties:
         field:
           type: string
-          enum: [body, email, pseudo, password, credentials, refreshToken]
-          description: "'body' when the request as a whole is unreadable (not JSON, unknown or duplicate property, wrong type, too large)."
+          enum: [body, request, email, pseudo, password, credentials, refreshToken, currentPassword, newPassword]
+          description: |
+            'body' when the request as a whole is unreadable (not JSON, unknown or duplicate property,
+            wrong type, too large); 'request' for the limits (too_many_attempts, server_busy).
         code:
           type: string
           enum:
@@ -415,8 +581,12 @@ components:
             - password_required
             - password_too_short
             - password_too_long
+            - password_too_common
+            - password_unchanged
             - invalid_credentials
             - refresh_token_invalid
+            - too_many_attempts
+            - server_busy
     HealthStatus:
       type: object
       additionalProperties: false
