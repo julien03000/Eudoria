@@ -86,7 +86,9 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
 ## Environnement
 - **Règle d'installation : tout sur E:.** Le disque C: n'a qu'environ 50 Go libres ; seuls les composants
   qui l'exigent y vont (Visual Studio en installe une partie de force, estimée à 8–12 Go ; Docker < 1 Go).
-  Les caches (Unreal DDC/Zen, Docker, Fab, SDK Android) doivent être redirigés vers E:.
+  Les caches (Unreal DDC/Zen, Docker, Fab, SDK Android, NuGet) doivent être redirigés vers E:.
+  Faits : DDC/Zen → `E:\Dev\UnrealCache\DDC` (variable utilisateur `UE-LocalDataCachePath`) ;
+  NuGet → `E:\Dev\NuGet\packages` (variable utilisateur `NUGET_PACKAGES`).
   Ne rien installer sans mon accord. Détail des outils et tailles : `docs/SETUP.md`.
 - **Unreal Engine 5.8.4** (version du lanceur Epic) : `E:\Epic Games\UE_5.8`
   - Éditeur : `E:\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe`
@@ -96,7 +98,7 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
 - **Visual Studio 2026 Community 18.12.1** : `E:\Dev\VisualStudio\2026\Community` (composants partagés `E:\Dev\VisualStudio\Shared`,
   cache `E:\Dev\VisualStudio\Cache`) ; composants listés dans `tools/vs/eudoria.vsconfig`. MSVC 14.52, Windows SDK 10.0.26100 (sur C:).
 - **.NET** (installé par VS, sur C: `C:\Program Files\dotnet`) : SDK **11.0.100** ; runtimes **10.0.15** et 11.0.0 (ASP.NET Core inclus).
-  Le noyau cible **net10.0 (LTS)** comme décidé (ADR-0001) ; le SDK 11 sait compiler pour net10.0.
+  Le noyau cible **net10.0 (LTS)** comme décidé (ADR-0001) ; compilé avec le SDK 11, **épinglé par `global.json`** (racine).
 - **Docker Desktop** : programme `E:\Dev\Docker\Program`, données WSL `E:\Dev\Docker\Data`, moteur WSL 2.
   Mémoire de WSL limitée à 4 Go par `%USERPROFILE%\.wslconfig` (s'applique aussi à la distribution Ubuntu existante) ; à relever à 32 Go.
 - Installateurs officiels conservés dans `E:\Dev\_installers` (supprimables).
@@ -105,10 +107,9 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
 - **Tant que le poste a 16 Go de RAM : limiter les compilations parallèles d'Unreal Build Tool** pour éviter
   les plantages par manque de mémoire. Dans `%APPDATA%\Unreal Engine\UnrealBuildTool\BuildConfiguration.xml` :
   `MaxParallelActions` (ex. 6 au lieu de 24 automatiques) et `ParallelExecutor/MemoryPerActionBytes`.
-  ⚠️ Epic indique que `MaxParallelActions` s'applique aux exécuteurs Parallel/Hybrid/Local, sans mentionner
-  l'Unreal Build Accelerator (UBA, exécuteur local par défaut) : à la première compilation (étape 1), vérifier
-  dans le journal d'UBT le nombre de tâches réellement lancées ; si la limite est ignorée, désactiver l'UBA
-  local (`bAllowUBALocalExecutor` = false). Retirer ces limites une fois à 32 Go.
+  **Fait le 2026-11-24 :** `MaxParallelActions` = 6, `MemoryPerActionBytes` = 2 Gio. Le code d'UBT 5.8
+  (`ExecutorFactory.cs`) transmet bien cette limite à l'UBA, toujours utilisé en 5.8 ; à confirmer dans le
+  journal d'UBT à la première compilation. Retirer ces limites une fois à 32 Go.
 
 ## Structure du dépôt
 Validée le 2026-11-24 (monorepo). Le détail interne de chaque dossier est défini à l'étape qui le crée.

@@ -1,7 +1,7 @@
 # EUDORIA — Architecture globale
 
-> Statut : **proposition (Phase 0, révision 2)**. Vue d'ensemble à haut niveau, sans détail d'implémentation.
-> Les choix de technologies sont traités dans `docs/decisions/` (ADR, tous au statut « Proposé »).
+> Statut : **révision 3 (étape 1.1, 2026-11-24)**. Vue d'ensemble, plus l'état réel du code en section 8.
+> Les choix de technologies sont traités dans `docs/decisions/` (ADR 0001 à 0006 au statut « Accepté »).
 > Hypothèses actuelles : client et serveurs de monde sous **Unreal Engine 5** (ADR-0003, ADR-0004),
 > noyau en **C#/.NET** (ADR-0001), base **PostgreSQL** (ADR-0002).
 
@@ -138,7 +138,7 @@ flowchart TB
 - Les opérations économiques sont atomiques et journalisées.
 - Les secrets ne sont jamais dans le code (variables d'environnement).
 
-## 6. Structure du dépôt (proposition, à valider avec les ADR)
+## 6. Structure du dépôt (validée le 2026-11-24)
 
 Un seul dépôt git (« monorepo ») :
 
@@ -162,7 +162,42 @@ eudoria/
 Le détail interne de chaque dossier sera défini à l'étape qui le crée.
 
 ## 7. Ce qui n'est pas encore décidé
-- Validation des ADR 0001 à 0005.
-- Hébergeur du dépôt distant (quotas Git LFS) → ADR futur (voir ADR-0005).
 - Hébergement des serveurs (Linux), déploiement, observabilité → avant toute mise en ligne publique.
 - Mécanisme de distribution du contenu des mondes (paquets par monde) → étape 6.
+
+## 8. Le noyau aujourd'hui (étape 1.1)
+
+```
+global.json                      # SDK .NET 11 épinglé ; lanceur de tests Microsoft.Testing.Platform
+.editorconfig                    # style de code (lu par Visual Studio et `dotnet format`)
+.env.example                     # modèle des réglages locaux (.env, jamais commité)
+shared/api/core-v1.yaml          # contrat OpenAPI public v1 — écrit AVANT le code
+tools/dev/
+├── docker-compose.yml           # PostgreSQL 18.7, publié sur 127.0.0.1 uniquement
+├── DotEnv.ps1                   # lecture de .env (partagée par les deux scripts)
+├── start-db.ps1                 # démarre / arrête la base (-Stop)
+└── run-core.ps1                 # lance le noyau, chaîne de connexion construite en mémoire
+core/
+├── Eudoria.Core.slnx            # solution
+├── Directory.Build.props        # net10.0, avertissements = erreurs, analyse figée sur .NET 10
+├── Directory.Packages.props     # TOUTES les versions de paquets, au même endroit
+├── src/Eudoria.Core.Api/        # hôte ASP.NET Core (Minimal APIs)
+│   ├── Program.cs               # démarrage ; routes publiques sous /v1
+│   ├── Database/                # options + source de données PostgreSQL (Npgsql)
+│   └── Health/                  # /v1/health/live et /v1/health/ready
+└── tests/Eudoria.Core.Api.Tests/
+    ├── HealthEndpointsTests.cs  # comportement des routes
+    ├── ContractTests.cs         # le noyau respecte core-v1.yaml, dans les deux sens
+    └── Infrastructure/          # noyau en mémoire, PostgreSQL jetable (Testcontainers), validateur de schéma
+```
+
+- **Exécution :** le programme cible `net10.0` et tourne sur le runtime **.NET 10 LTS** (ADR-0001) ; le SDK 11
+  ne sert qu'à compiler.
+- **Monolithe modulaire :** un seul projet hôte pour l'instant. Chaque service du noyau deviendra un projet
+  séparé (`Eudoria.Core.Identity` à l'étape 1.2) que l'hôte assemble.
+- **Configuration :** la chaîne de connexion vient de `ConnectionStrings:Core` (variable d'environnement
+  `ConnectionStrings__Core`). Sans elle, le noyau **refuse de démarrer**.
+- **Santé :** `live` ne touche à rien (le processus répond) ; `ready` exécute `SELECT 1` sur PostgreSQL avec
+  un délai maximum de 2 s et répond 503 sinon. Aucune réponse ne contient de détail interne : les causes
+  sont dans les journaux du serveur seulement.
+- **Tests :** xUnit v3 ; base PostgreSQL réelle et jetable créée dans Docker à chaque série de tests.

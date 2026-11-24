@@ -1,6 +1,6 @@
 # Étape 1.1 — Squelette du noyau + environnement local + route « santé »
 
-- **Statut :** 📝 Proposé — en attente du « OK » du porteur
+- **Statut :** ✅ Réalisé le 2026-11-24 (OK du porteur le 2026-11-24) — en attente de validation de la 1.1
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.1 **uniquement**. Aucun compte, aucune table, aucun Entity Framework : tout ça est la 1.2.
@@ -190,3 +190,17 @@ Pour la validation des schémas JSON dans le test de contrat, je commencerai san
 6. `docs(architecture): describe core skeleton and local setup` (+ `SETUP.md`, `PROGRESS.md`)
 
 Puis envoi de la branche sur GitHub. La sous-étape 1.2 ne commence qu'après ta validation de la 1.1.
+
+## 10. Écarts constatés pendant la réalisation
+
+| Prévu | Réalisé | Pourquoi |
+|---|---|---|
+| `core/global.json` | `global.json` **à la racine** | `dotnet` cherche ce fichier à partir du dossier où on lance la commande ; `run-core.ps1` est lancé depuis la racine |
+| `Microsoft.NET.Test.Sdk` + `xunit.runner.visualstudio` | **retirés** ; `global.json` active `Microsoft.Testing.Platform` | Le SDK .NET 10+ refuse l'ancien lanceur de tests (VSTest) avec xUnit v3 ; la nouvelle plateforme est intégrée à xUnit v3 |
+| `Host=localhost` | `Host=127.0.0.1` dans `run-core.ps1` | `localhost` → IPv6 `::1` d'abord, ~2 s perdues (voir `docs/SETUP.md`) ; trouvé au premier lancement réel |
+| `.editorconfig` en CRLF | LF, CRLF pour les scripts | Aligné sur `.gitattributes` (règle existante du dépôt) |
+| Exceptions CA1707 / CA1711 | Tirets bas autorisés dans les **noms de tests** uniquement | Convention de lisibilité des tests ; règle maintenue dans le code de production |
+| — | Fichier `tools/dev/DotEnv.ps1` en plus | Lecture de `.env` partagée par les deux scripts au lieu d'être recopiée |
+
+Versions retenues : PostgreSQL **18.7**, Npgsql 10.0.4, Microsoft.AspNetCore.Mvc.Testing 10.0.15,
+xunit.v3 4.0.3, Testcontainers.PostgreSql 4.17.0, Microsoft.OpenApi (+ YamlReader) 3.11.1.

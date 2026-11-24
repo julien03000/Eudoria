@@ -82,10 +82,37 @@ affichée en bas de l'installateur.
 
 | Cache | Emplacement par défaut | Taille actuelle | Quand |
 |---|---|---|---|
-| Cache de données dérivées Unreal (DDC, Zen) | `%LOCALAPPDATA%\UnrealEngine\Common` | 1,9 Go (mesuré) — grossit avec les projets, souvent plusieurs dizaines de Go | Début d'étape 1 |
+| Cache de données dérivées Unreal (DDC, Zen) | `%LOCALAPPDATA%\UnrealEngine\Common` | ✅ **Redirigé le 2026-11-24** vers `E:\Dev\UnrealCache\DDC` (Zen dans `...\DDC\Zen`) par la variable d'environnement utilisateur `UE-LocalDataCachePath` ; anciens caches supprimés | Fait |
+| Paquets NuGet (.NET) | `%USERPROFILE%\.nuget\packages` | ✅ **Redirigé le 2026-11-24** vers `E:\Dev\NuGet\packages` (variable utilisateur `NUGET_PACKAGES`) | Fait |
 | Cache de téléchargement Visual Studio | `C:\ProgramData\Microsoft\VisualStudio\Packages` | — | À l'installation de VS |
 | Disque virtuel Docker (WSL 2) | `%LOCALAPPDATA%\Docker` | — | À l'installation de Docker |
 | Bibliothèque Fab (assets téléchargés) | `%LOCALAPPDATA%\Temp\FabLibrary` | supprimée le 2026-11-24 (6,1 Go libérés) | Rediriger vers E: dans les réglages du lanceur/Fab avant de retélécharger des assets |
+
+## Lancer le noyau en local (depuis l'étape 1.1)
+
+Prérequis : Docker Desktop **démarré**. Depuis la racine du dépôt, dans PowerShell :
+
+```powershell
+Copy-Item .env.example .env       # une seule fois, puis remplacer le mot de passe dans .env
+.\tools\dev\start-db.ps1          # démarre PostgreSQL (attend qu'il soit prêt)
+.\tools\dev\run-core.ps1          # démarre le noyau sur http://localhost:5080
+```
+
+Vérifier : <http://localhost:5080/v1/health/live> et <http://localhost:5080/v1/health/ready> → `{"status":"ok"}`.
+Arrêter : `Ctrl+C` pour le noyau, `.\tools\dev\start-db.ps1 -Stop` pour la base (les données sont conservées).
+
+Vérifications de « terminé », depuis `core/` :
+
+```powershell
+dotnet build Eudoria.Core.slnx                  # 0 avertissement, 0 erreur
+dotnet test --solution Eudoria.Core.slnx        # Docker Desktop doit être démarré
+dotnet format Eudoria.Core.slnx --verify-no-changes
+```
+
+Notes :
+- Les tests créent leur propre base PostgreSQL jetable (Testcontainers) : ils n'utilisent pas celle de `start-db.ps1`.
+- `run-core.ps1` vise `127.0.0.1` et non `localhost` : `localhost` se résout d'abord en IPv6 (`::1`), où la base
+  n'écoute pas, et Windows met environ 2 s à abandonner, soit tout le délai du contrôle de santé.
 
 ## Plan d'installation — Visual Studio 2026 et Docker Desktop (en attente de validation)
 

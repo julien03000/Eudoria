@@ -48,7 +48,24 @@
     en 5.8, reçoit `MaxParallelActions` et lit `MemoryPerActionBytes` → **inutile de désactiver l'UBA**.
     Confirmation pratique (nombre de tâches parallèles dans le journal d'UBT) à la première compilation (1.5).
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
-- **Plan de la sous-étape 1.1** rédigé : `docs/plans/etape-01-1.md` — **en attente du « OK » du porteur**. Aucun code écrit.
+- **Plan de la sous-étape 1.1** (`docs/plans/etape-01-1.md`) validé par le porteur (SDK 11 épinglé, cache NuGet sur E:, dépendances).
+- **ROADMAP** : sous-étape **1.7 — Test de rendu** ajoutée (scène après connexion, troisième personne en C++,
+  Lumen + Nanite, assets Fab gratuits, mesures images/s / mémoire vidéo / RAM notées dans `docs/`, validation de l'ADR-0003).
+- **Sous-étape 1.1 réalisée (2026-11-24), en attente de validation du porteur** :
+  - cache NuGet redirigé : variable utilisateur `NUGET_PACKAGES = E:\Dev\NuGet\packages` ;
+  - `.gitignore` : règles .NET ajoutées, règles `*.sln`/`*.slnx` limitées à `unreal/` ;
+  - contrat `shared/api/core-v1.yaml` (OpenAPI 3.1) : `GET /v1/health/live`, `GET /v1/health/ready` ;
+  - PostgreSQL **18.7** via `tools/dev/docker-compose.yml` (127.0.0.1 seulement, volume Docker sur E:),
+    scripts `start-db.ps1` / `run-core.ps1`, `.env.example` ; ton `.env` local a été créé avec un mot de passe
+    aléatoire (jamais affiché, jamais commité) ;
+  - noyau `core/` (net10.0, SDK 11 épinglé par `global.json` à la racine) : refuse de démarrer sans chaîne de connexion ;
+  - **vérifié en lancement réel** : live → 200, ready → 200 (base démarrée) / 503 `{"status":"unavailable"}`
+    en 42 ms (base arrêtée), route inconnue → 404, mot de passe absent des journaux ;
+  - **10 tests passent** (intégration + contrat, base PostgreSQL jetable via Testcontainers) ; un test de mutation
+    (réponse volontairement faussée) fait bien échouer 2 tests ; build 0 avertissement ; `dotnet format` propre ;
+  - écarts par rapport au plan : § 10 de `docs/plans/etape-01-1.md`.
+- Au premier lancement de `dotnet`, le SDK a créé un certificat HTTPS de développement **non approuvé** (normal,
+  sans effet) ; l'approuver (`dotnet dev-certs https --trust`) reste à décider en 1.5.
 
 ## 🧹 Traces de l'ancienne installation d'Unreal (décisions du porteur, 2026-11-24)
 
@@ -65,7 +82,8 @@
 ## ⚠️ Problèmes connus / points d'attention
 - **Sauvegarde** : le dépôt est sur GitHub ; la seconde sauvegarde indépendante recommandée par l'ADR-0006 (disque externe) n'est pas encore en place.
 - Quota LFS gratuit de GitHub : 10 Gio de stockage et 10 Gio de téléchargement par mois — à surveiller dès l'arrivée des premiers assets.
-- **.NET** : Visual Studio 18.12 a installé le SDK **11** (et non 10). Le runtime .NET 10 LTS est présent et le SDK 11 compile pour net10.0 : conforme à l'ADR-0001. Recommandation (plan 1.1, § 2) : SDK 11 épinglé par `global.json`, cible `net10.0` — en attente de décision.
+- **.NET** : Visual Studio 18.12 a installé le SDK **11** (et non 10). Le runtime .NET 10 LTS est présent et le SDK 11 compile pour net10.0 : conforme à l'ADR-0001. Décision (2026-11-24) : SDK 11 épinglé par `global.json`, cible `net10.0`.
+- **Tests du noyau** : Docker Desktop doit être démarré (base jetable Testcontainers).
 - **Mémoire vive : 16 Go** (32 recommandés). Passage à 32 Go prévu avant l'étape 3. En attendant : `MaxParallelActions` = 6 (fait ; s'applique à l'UBA d'après le code d'UBT 5.8). Retirer la limite une fois à 32 Go.
 - **Disque C:** ~71 Go libres ; il descend temporairement pendant les installations.
 - `LauncherInstalled.dat` ne liste pas encore UE 5.8 : vérifier que le moteur apparaît dans la Bibliothèque du lanceur.
@@ -73,8 +91,7 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Le porteur relit `docs/plans/etape-01-1.md` et répond aux points du § 7 (SDK 11 épinglé ou SDK 10 ;
-   cache NuGet sur E: ; Testcontainers ; dépendances).
-2. Après son « OK » : réaliser la **sous-étape 1.1** (squelette du noyau, PostgreSQL via Docker Compose,
-   routes `/v1/health/live` et `/v1/health/ready`, tests) en suivant les commits du § 9 du plan.
-3. Ne pas commencer la 1.2 avant la validation de la 1.1.
+1. Le porteur **valide la sous-étape 1.1** (procédure de test : `docs/SETUP.md`, section « Lancer le noyau en local »).
+2. Ensuite seulement : proposer le plan détaillé de la **sous-étape 1.2** (modèle de compte, migrations EF Core,
+   inscription `POST /v1/...` décrite d'abord dans `core-v1.yaml`, premier module `Eudoria.Core.Identity`),
+   l'écrire dans `docs/plans/etape-01-2.md` et attendre le « OK ».
