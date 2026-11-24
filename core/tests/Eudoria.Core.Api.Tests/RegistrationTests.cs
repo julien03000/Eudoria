@@ -40,7 +40,7 @@ public sealed class RegistrationTests(PostgresFixture database)
         Assert.Equal(pseudo.ToLowerInvariant(), account.PseudoNormalized);
         Assert.Equal(7, account.Id.Version); // UUID v7
         Assert.InRange(account.CreatedAt, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddMinutes(1));
-        Assert.StartsWith("$argon2id$v=19$m=19456,t=2,p=1$", account.PasswordHash, StringComparison.Ordinal);
+        Assert.StartsWith("$argon2id$v=19$m=65536,t=3,p=1$", account.PasswordHash, StringComparison.Ordinal);
         Assert.DoesNotContain(Password, account.PasswordHash, StringComparison.Ordinal);
         Assert.True(new Argon2idPasswordHasher(Argon2idOptions.Default).Verify(Password, account.PasswordHash));
     }

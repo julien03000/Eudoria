@@ -5,8 +5,11 @@ using NSec.Cryptography;
 
 namespace Eudoria.Core.Identity.Passwords;
 
-/// <summary>Argon2id cost parameters. Defaults: OWASP minimum (19 MiB, 2 passes, 1 lane).</summary>
-internal sealed record Argon2idOptions(int MemoryKib = 19 * 1024, int Passes = 2)
+/// <summary>
+/// Argon2id cost parameters. Defaults: 64 MiB, 3 passes, 1 lane — RFC 9106 second recommended option
+/// (memory-constrained), with p = 1 imposed by libsodium. Owner decision of 2026-11-24 (plan 1.2, section 12).
+/// </summary>
+internal sealed record Argon2idOptions(int MemoryKib = 64 * 1024, int Passes = 3)
 {
     public static readonly Argon2idOptions Default = new();
 }
@@ -54,7 +57,7 @@ internal sealed class Argon2idPasswordHasher(Argon2idOptions options) : IPasswor
             NumberOfPasses = passes,
         });
 
-    // $argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>
+    // $argon2id$v=19$m=65536,t=3,p=1$<salt>$<hash>
     private static bool TryParse(string phc, out int memoryKib, out int passes, out byte[] salt, out byte[] hash)
     {
         memoryKib = passes = 0;

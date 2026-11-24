@@ -54,18 +54,23 @@ public sealed class Argon2idPasswordHasherTests
         Assert.False(_hasher.Verify("correct horse battery staple", hash));
 
     [Fact]
-    public void ProductionCost_IsTheOwaspMinimum_AndReallyCostsTime()
+    public void ProductionCost_IsTheChosenSetting_AndReallyCostsTime()
     {
         Argon2idPasswordHasher production = new(Argon2idOptions.Default);
-        production.Hash("warm-up password"); // loads libsodium
+        string hash = production.Hash("warm-up password"); // loads libsodium
 
-        Stopwatch watch = Stopwatch.StartNew();
-        string hash = production.Hash("correct horse battery staple");
-        watch.Stop();
+        double[] timings = [.. Enumerable.Range(0, 5).Select(_ =>
+        {
+            Stopwatch watch = Stopwatch.StartNew();
+            production.Hash("correct horse battery staple");
+            return watch.Elapsed.TotalMilliseconds;
+        }).Order()];
+        double median = timings[2];
 
-        Assert.StartsWith("$argon2id$v=19$m=19456,t=2,p=1$", hash, StringComparison.Ordinal);
-        // 19 MiB filled twice cannot take under 5 ms; this would catch a memory size read in bytes instead of KiB.
-        Assert.True(watch.Elapsed > TimeSpan.FromMilliseconds(5), $"Hashing took only {watch.Elapsed.TotalMilliseconds} ms.");
-        TestContext.Current.SendDiagnosticMessage($"Argon2id (19 MiB, t=2, p=1): {watch.Elapsed.TotalMilliseconds:F1} ms");
+        Assert.StartsWith("$argon2id$v=19$m=65536,t=3,p=1$", hash, StringComparison.Ordinal);
+        // 64 MiB filled 3 times cannot take under 5 ms; this would catch a memory size read in bytes instead of KiB.
+        Assert.True(median > 5, $"Hashing took only {median} ms.");
+        TestContext.Current.SendDiagnosticMessage(
+            $"Argon2id (64 MiB, t=3, p=1): median {median:F1} ms, min {timings[0]:F1} ms, max {timings[4]:F1} ms");
     }
 }
