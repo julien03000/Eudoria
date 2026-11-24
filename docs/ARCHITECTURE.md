@@ -1,6 +1,6 @@
 # EUDORIA — Architecture globale
 
-> Statut : **révision 3 (étape 1.1, 2026-11-24)**. Vue d'ensemble, plus l'état réel du code en section 8.
+> Statut : **révision 4 (étape 1.2, 2026-11-24)**. Vue d'ensemble, plus l'état réel du code en section 8.
 > Les choix de technologies sont traités dans `docs/decisions/` (ADR 0001 à 0006 au statut « Accepté »).
 > Hypothèses actuelles : client et serveurs de monde sous **Unreal Engine 5** (ADR-0003, ADR-0004),
 > noyau en **C#/.NET** (ADR-0001), base **PostgreSQL** (ADR-0002).
@@ -165,39 +165,59 @@ Le détail interne de chaque dossier sera défini à l'étape qui le crée.
 - Hébergement des serveurs (Linux), déploiement, observabilité → avant toute mise en ligne publique.
 - Mécanisme de distribution du contenu des mondes (paquets par monde) → étape 6.
 
-## 8. Le noyau aujourd'hui (étape 1.1)
+## 8. Le noyau aujourd'hui (étape 1.2)
 
 ```
 global.json                      # SDK .NET 11 épinglé ; lanceur de tests Microsoft.Testing.Platform
-.editorconfig                    # style de code (lu par Visual Studio et `dotnet format`)
+.editorconfig                    # style de code (lu par Visual Studio et `dotnet format`) ; migrations = code généré
+.config/dotnet-tools.json        # outil local dotnet-ef (version épinglée)
 .env.example                     # modèle des réglages locaux (.env, jamais commité)
 shared/api/core-v1.yaml          # contrat OpenAPI public v1 — écrit AVANT le code
 tools/dev/
 ├── docker-compose.yml           # PostgreSQL 18.7, publié sur 127.0.0.1 uniquement
-├── DotEnv.ps1                   # lecture de .env (partagée par les deux scripts)
+├── DotEnv.ps1                   # lecture de .env + chaîne de connexion en mémoire (partagés par les scripts)
 ├── start-db.ps1                 # démarre / arrête la base (-Stop)
+├── migrate.ps1                  # applique les migrations de chaque module (geste volontaire, jamais au démarrage)
 └── run-core.ps1                 # lance le noyau, chaîne de connexion construite en mémoire
 core/
 ├── Eudoria.Core.slnx            # solution
 ├── Directory.Build.props        # net10.0, avertissements = erreurs, analyse figée sur .NET 10
 ├── Directory.Packages.props     # TOUTES les versions de paquets, au même endroit
 ├── src/Eudoria.Core.Api/        # hôte ASP.NET Core (Minimal APIs)
-│   ├── Program.cs               # démarrage ; routes publiques sous /v1
-│   ├── Database/                # options + source de données PostgreSQL (Npgsql)
+│   ├── Program.cs               # démarrage ; assemble les modules ; routes publiques sous /v1
+│   ├── Database/                # options + source de données PostgreSQL (Npgsql), partagée par les modules
 │   └── Health/                  # /v1/health/live et /v1/health/ready
-└── tests/Eudoria.Core.Api.Tests/
-    ├── HealthEndpointsTests.cs  # comportement des routes
-    ├── ContractTests.cs         # le noyau respecte core-v1.yaml, dans les deux sens
-    └── Infrastructure/          # noyau en mémoire, PostgreSQL jetable (Testcontainers), validateur de schéma
+├── src/Eudoria.Core.Identity/   # module Identité (comptes) — seule partie publique : IdentityModule
+│   ├── IdentityModule.cs        # AddIdentityModule() / MapIdentityEndpoints()
+│   ├── Accounts/                # entité Account ; règles et normalisation (e-mail, pseudo, mot de passe NFKC)
+│   ├── Passwords/               # IPasswordHasher ; Argon2id via NSec (libsodium), format PHC
+│   ├── Registration/            # POST /v1/accounts : lecture stricte du corps, service d'inscription
+│   └── Persistence/             # EF Core : IdentityDbContext (schéma « identity »), configuration, Migrations/
+└── tests/
+    ├── Eudoria.Core.Identity.Tests/  # unitaires : règles, NFKC, Argon2id (dont coût réel mesuré)
+    └── Eudoria.Core.Api.Tests/
+        ├── HealthEndpointsTests.cs   # comportement des routes santé
+        ├── RegistrationTests.cs      # inscription de bout en bout, concurrence, journaux, migrations à jour
+        ├── ContractTests.cs          # le noyau respecte core-v1.yaml, dans les deux sens
+        ├── SchemaValidatorTests.cs   # le validateur maison rejette bien ce qu'il prétend vérifier
+        └── Infrastructure/           # noyau en mémoire, PostgreSQL jetable migrée, capture des journaux
 ```
 
 - **Exécution :** le programme cible `net10.0` et tourne sur le runtime **.NET 10 LTS** (ADR-0001) ; le SDK 11
   ne sert qu'à compiler.
-- **Monolithe modulaire :** un seul projet hôte pour l'instant. Chaque service du noyau deviendra un projet
-  séparé (`Eudoria.Core.Identity` à l'étape 1.2) que l'hôte assemble.
+- **Monolithe modulaire :** l'hôte `Eudoria.Core.Api` assemble les modules ; chaque module est un projet séparé dont
+  tout est `internal` sauf sa classe d'entrée (`IdentityModule`). Chaque module possède **son schéma PostgreSQL** et
+  **ses migrations** (historique dans `<schéma>.__ef_migrations_history`) ; aucun module ne lit les tables d'un autre.
+  Tous partagent une seule source de connexions (`NpgsqlDataSource`) enregistrée par l'hôte.
+- **Comptes (`identity.accounts`) :** `id` UUID v7 (identifiant stable, le seul que les autres systèmes stockeront),
+  `email` normalisé unique, `pseudo` tel que saisi + `pseudo_normalized` unique (casse ignorée), `password_hash`
+  Argon2id au format PHC (paramètres inclus, durcissables plus tard), `created_at`. Unicité garantie par la base.
+- **Inscription :** `POST /v1/accounts` → 202 (créé, **ou** e-mail déjà utilisé : indiscernable exprès), 400 / 409 en
+  Problem Details (RFC 9457) avec un code machine par erreur. Mot de passe normalisé NFKC avant contrôle et hachage.
+  Ni l'e-mail ni le mot de passe ne sont journalisés.
 - **Configuration :** la chaîne de connexion vient de `ConnectionStrings:Core` (variable d'environnement
   `ConnectionStrings__Core`). Sans elle, le noyau **refuse de démarrer**.
 - **Santé :** `live` ne touche à rien (le processus répond) ; `ready` exécute `SELECT 1` sur PostgreSQL avec
   un délai maximum de 2 s et répond 503 sinon. Aucune réponse ne contient de détail interne : les causes
   sont dans les journaux du serveur seulement.
-- **Tests :** xUnit v3 ; base PostgreSQL réelle et jetable créée dans Docker à chaque série de tests.
+- **Tests :** xUnit v3 ; base PostgreSQL réelle et jetable créée dans Docker à chaque série de tests, migrations appliquées.

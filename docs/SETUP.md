@@ -95,10 +95,18 @@ Prérequis : Docker Desktop **démarré**. Depuis la racine du dépôt, dans Pow
 ```powershell
 Copy-Item .env.example .env       # une seule fois, puis remplacer le mot de passe dans .env
 .\tools\dev\start-db.ps1          # démarre PostgreSQL (attend qu'il soit prêt)
+.\tools\dev\migrate.ps1           # applique les migrations manquantes (à relancer après chaque nouvelle migration)
 .\tools\dev\run-core.ps1          # démarre le noyau sur http://localhost:5080
 ```
 
 Vérifier : <http://localhost:5080/v1/health/live> et <http://localhost:5080/v1/health/ready> → `{"status":"ok"}`.
+Créer un compte (exemple) :
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/accounts -ContentType 'application/json' -Body '{"email":"ana@example.com","pseudo":"Ana_42","password":"une-phrase-de-passe-longue"}'
+```
+→ `status : accepted`. Rejouer la même commande → erreur 409 (`pseudo_taken`).
+
 Arrêter : `Ctrl+C` pour le noyau, `.\tools\dev\start-db.ps1 -Stop` pour la base (les données sont conservées).
 
 Vérifications de « terminé », depuis `core/` :
@@ -110,6 +118,10 @@ dotnet format Eudoria.Core.slnx --verify-no-changes
 ```
 
 Notes :
+- **Smart App Control** (Windows 11) doit être **désactivé** : il bloquait au cas par cas les DLL fraîchement
+  compilées (erreur `0x800711C7`). Désactivé par le porteur le 2026-11-24.
+- Le cache NuGet est sur E: grâce à la variable utilisateur `NUGET_PACKAGES` ; un terminal ouvert avant sa création
+  ne la voit pas (les paquets iraient sur C:) : ouvrir un nouveau terminal.
 - Les tests créent leur propre base PostgreSQL jetable (Testcontainers) : ils n'utilisent pas celle de `start-db.ps1`.
 - `run-core.ps1` vise `127.0.0.1` et non `localhost` : `localhost` se résout d'abord en IPv6 (`::1`), où la base
   n'écoute pas, et Windows met environ 2 s à abandonner, soit tout le délai du contrôle de santé.
