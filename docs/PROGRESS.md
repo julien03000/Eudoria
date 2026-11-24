@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-24 (sous-étape 1.4 réalisée, en attente de validation)
+**Dernière mise à jour :** 2026-11-24 (sous-étape 1.4 validée)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -50,7 +50,7 @@
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
 - **Plan de la sous-étape 1.4 validé** le 2026-11-24 (8 recommandations + compléments du porteur : IPv6 compté par
   préfixe /64 ; liste de mots de passe SecLists **1 million + liste française**, choix du porteur).
-- **Sous-étape 1.4 réalisée le 2026-11-24 — 🟡 en attente de ta validation** (`docs/plans/etape-01-4.md`, § 15) :
+- **Sous-étape 1.4 réalisée et ✅ validée par le porteur le 2026-11-24** (`docs/plans/etape-01-4.md`, § 15) :
   - contrat core-v1 **1.3.0** : `POST /v1/me/password`, `POST /v1/me/sessions/revoke-all`, réponses 429 (`Retry-After`)
     et 503 `server_busy`, codes `password_too_common`, `password_unchanged`, `too_many_attempts` ;
   - **limitation des tentatives** : échecs comptés par e-mail + adresse (5 gratuits, puis 1 → 15 min) et par e-mail seul
@@ -148,8 +148,6 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. **Le porteur valide la sous-étape 1.4** (compte rendu : `docs/plans/etape-01-4.md`, § 15). Si possible, refaire avant
-   les mesures de durée sur un poste au repos (je peux les relancer sur demande).
-2. Ensuite, sur demande du porteur seulement : proposer le plan de la **sous-étape 1.5** (création du projet Unreal en C++,
+1. Sur demande du porteur seulement : proposer le plan de la **sous-étape 1.5** (création du projet Unreal en C++,
    plugin socle `EudoriaCore`, Git LFS, client minimal : écrans « Créer un compte », « Se connecter », « Bienvenue »),
    l'écrire dans `docs/plans/etape-01-5.md` et attendre le « OK ». **Ne pas commencer la 1.5 sans son accord.**

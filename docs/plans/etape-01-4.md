@@ -1,6 +1,6 @@
 # Étape 1.4 — Protections : limitation des tentatives, mots de passe courants, changement de mot de passe
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (les 8 recommandations du § 11 + compléments du § 11.1) — ✅ réalisé, **en attente de la validation du porteur** (compte rendu : § 15)
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (les 8 recommandations du § 11 + compléments du § 11.1) — ✅ réalisé, puis **sous-étape validée par le porteur le 2026-11-24** (compte rendu : § 15)
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.4 **uniquement** : tout ce qui a été reporté en 1.4 par les plans 1.2 et 1.3 et par la
