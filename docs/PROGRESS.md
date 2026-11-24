@@ -48,7 +48,16 @@
     en 5.8, reçoit `MaxParallelActions` et lit `MemoryPerActionBytes` → **inutile de désactiver l'UBA**.
     Confirmation pratique (nombre de tâches parallèles dans le journal d'UBT) à la première compilation (1.5).
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
-- **Plan de la sous-étape 1.2** rédigé (`docs/plans/etape-01-2.md`), **en attente du « OK » du porteur**.
+- **Plan de la sous-étape 1.2 validé** le 2026-11-24 (choix du porteur : § 9.1 du plan ; NSec vérifié : MIT, maintenu).
+- **Sous-étape 1.2 en cours — ⛔ bloquée par Smart App Control** :
+  - fait et commité : contrat `POST /v1/accounts` (v1.1.0), module `Eudoria.Core.Identity` (règles, NFKC, Argon2id via NSec,
+    modèle, migration `CreateAccounts`, route), `tools/dev/migrate.ps1` ; migration **appliquée avec succès** à la base locale
+    (table `identity.accounts` vérifiée) ; compilation 0 avertissement ;
+  - écrit **mais pas encore commité** (non vérifié) : tests unitaires (`Eudoria.Core.Identity.Tests`), tests d'intégration,
+    de concurrence, de journaux et de contrat (`Eudoria.Core.Api.Tests`) ;
+  - **blocage** : Smart App Control (Windows 11, activé sur le poste) refuse de charger la DLL recompilée
+    `Eudoria.Core.Identity.dll` (erreur 0x800711C7, journal CodeIntegrity) → les tests et le noyau ne peuvent pas démarrer.
+    Une version précédente de la même DLL était passée (jugement au cas par cas). Décision du porteur attendue.
 - **Plan de la sous-étape 1.1** (`docs/plans/etape-01-1.md`) validé par le porteur (SDK 11 épinglé, cache NuGet sur E:, dépendances).
 - **ROADMAP** : sous-étape **1.7 — Test de rendu** ajoutée (scène après connexion, troisième personne en C++,
   Lumen + Nanite, assets Fab gratuits, mesures images/s / mémoire vidéo / RAM notées dans `docs/`, validation de l'ADR-0003).
@@ -92,6 +101,6 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Le porteur relit le plan de la **sous-étape 1.2** (`docs/plans/etape-01-2.md` : modèle de compte, migrations
-   EF Core, inscription `POST /v1/accounts`, module `Eudoria.Core.Identity`) et tranche les **points de décision du § 9**.
-2. Après son « OK » seulement : réaliser la 1.2 selon ce plan (commits du § 11), puis envoyer la branche sur GitHub.
+1. Le porteur décide quoi faire de **Smart App Control** (voir « En cours »).
+2. Ensuite : lancer `dotnet test`, corriger, commiter les tests, lancement réel (`migrate.ps1`, `run-core.ps1`, inscription
+   par requête HTTP), mettre à jour `ARCHITECTURE.md` / `SETUP.md`, remplir le § 12 du plan, pousser la branche.

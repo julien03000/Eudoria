@@ -247,4 +247,17 @@ Puis envoi de la branche sur GitHub. La sous-étape 1.3 ne commence qu'après ta
 
 ## 12. Écarts constatés pendant la réalisation
 
-*(rempli pendant la réalisation)*
+| Prévu | Réalisé | Pourquoi |
+|---|---|---|
+| — | Restauration NuGet d'abord partie sur C: (429 Mo), supprimée puis refaite sur E: | Le terminal de Claude n'avait pas la variable `NUGET_PACKAGES` ; elle est désormais posée explicitement à chaque commande |
+| — | `.editorconfig` : migrations EF Core traitées comme du code généré | Le code produit par `dotnet ef` ne suit pas nos règles de style (avertissements = erreurs) |
+| — | `DotEnv.ps1` : fonction `Set-EudoriaConnectionString` partagée | Utilisée par `run-core.ps1` et `migrate.ps1` au lieu d'être recopiée |
+| Format des erreurs | Problem Details avec `type: about:blank` et une liste `errors[{field, code}]` (y compris pour 409) | Un seul format d'erreur à gérer côté client Unreal |
+| — | Champ `field: body` / code `body_invalid` | Corps illisible (pas du JSON, champ inconnu ou répété, mauvais type, > 8 Kio, Unicode invalide) |
+| Lecture du corps | Lecture stricte maison (`RegistrationRequestReader`), noms de champs sensibles à la casse | Contrôle total des refus, sans conversion silencieuse |
+
+Versions retenues : EF Core 10.0.15, Npgsql.EntityFrameworkCore.PostgreSQL 10.0.4, NSec.Cryptography 26.4.0 (libsodium 1.0.22),
+outil dotnet-ef 10.0.15.
+
+**Blocage rencontré :** Smart App Control (Windows 11) bloque `Eudoria.Core.Identity.dll` recompilée → tests impossibles à
+lancer pour l'instant (voir `docs/PROGRESS.md`).
