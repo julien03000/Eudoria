@@ -11,6 +11,10 @@ builder.Services.AddHealthChecks()
 
 WebApplication app = builder.Build();
 
+// Access tokens (Bearer, ES256) are checked before any protected route runs.
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Public API, major version 1 (contract: shared/api/core-v1.yaml).
 RouteGroupBuilder v1 = app.MapGroup("/v1");
 v1.MapHealthEndpoints();

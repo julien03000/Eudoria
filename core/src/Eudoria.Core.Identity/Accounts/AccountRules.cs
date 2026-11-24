@@ -121,5 +121,7 @@ internal static class AccountRules
         public const string PasswordRequired = "password_required";
         public const string PasswordTooShort = "password_too_short";
         public const string PasswordTooLong = "password_too_long";
+        public const string InvalidCredentials = "invalid_credentials";
+        public const string RefreshTokenInvalid = "refresh_token_invalid";
     }
 }
