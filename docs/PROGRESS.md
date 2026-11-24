@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-24 (sous-étape 1.4 validée)
+**Dernière mise à jour :** 2026-11-24 (plan 1.5 rédigé, en attente de validation)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,6 +35,14 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
+- **Plan de la sous-étape 1.5 rédigé le 2026-11-24, en attente de validation** (`docs/plans/etape-01-5.md`).
+  Le porteur a des remarques à faire avant de le valider. **Aucun code de la 1.5 n'est écrit.**
+  Vérifications faites pour le plan :
+  - `LauncherInstalled.dat` liste désormais UE 5.8.4 (`E:\Epic Games\UE_5.8`) → problème résolu ; reste le
+    contrôle visuel dans la Bibliothèque du lanceur (action T1 du plan) ;
+  - le plugin Fab 5.8 est enregistré vers `C:\Program Files\Epic Games\UE_5.8`, dossier inexistant → à régler en 1.7 ;
+  - certificat HTTPS de .NET présent mais non approuvé ; Unreal 5.8 accepte sous Windows les certificats approuvés
+    dans le magasin Windows (code du moteur lu) → option recommandée : `dotnet dev-certs https --trust`.
 - **Tâches techniques de début d'étape faites (2026-11-24)** :
   - **DDC et Zen d'Unreal redirigés vers E:** par la variable d'environnement utilisateur
     `UE-LocalDataCachePath = E:\Dev\UnrealCache\DDC`. Le code d'UE 5.8 (`ZenServerInterface.cpp`) fait suivre
@@ -144,7 +152,10 @@
 - **Tests du noyau** : Docker Desktop doit être démarré (base jetable Testcontainers).
 - **Mémoire vive : 16 Go** (32 recommandés). Passage à 32 Go prévu avant l'étape 3. En attendant : `MaxParallelActions` = 6 (fait ; s'applique à l'UBA d'après le code d'UBT 5.8). Retirer la limite une fois à 32 Go.
 - **Disque C:** ~71 Go libres ; il descend temporairement pendant les installations.
-- `LauncherInstalled.dat` ne liste pas encore UE 5.8 : vérifier que le moteur apparaît dans la Bibliothèque du lanceur.
+- ~~`LauncherInstalled.dat` ne liste pas encore UE 5.8~~ : résolu (vérifié le 2026-11-24) ; contrôle visuel dans la
+  Bibliothèque du lanceur à faire par le porteur (T1 du plan 1.5).
+- Plugin Fab 5.8 enregistré par le lanceur dans un dossier inexistant (`C:\Program Files\Epic Games\UE_5.8`) : à
+  réinstaller sur le moteur de E: avant la 1.7.
 - La limite mémoire WSL (4 Go) s'applique aussi à la distribution Ubuntu déjà présente sur le PC.
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
@@ -153,6 +164,5 @@
 - **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
   local » remplis pour le noyau, en attente du client Unreal).
 
-1. Sur demande du porteur seulement : proposer le plan de la **sous-étape 1.5** (création du projet Unreal en C++,
-   plugin socle `EudoriaCore`, Git LFS, client minimal : écrans « Créer un compte », « Se connecter », « Bienvenue »),
-   l'écrire dans `docs/plans/etape-01-5.md` et attendre le « OK ». **Ne pas commencer la 1.5 sans son accord.**
+1. **Recueillir les remarques du porteur sur le plan 1.5** (`docs/plans/etape-01-5.md`, notamment les 5 points du
+   § 10), modifier le plan si besoin, puis attendre son « OK ». **Ne rien coder de la 1.5 avant cet accord.**
