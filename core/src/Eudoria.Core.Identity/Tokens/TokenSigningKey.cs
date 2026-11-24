@@ -17,7 +17,13 @@ internal sealed class TokenSigningKey : IDisposable
     {
         _key = key;
         byte[] publicKeyHash = SHA256.HashData(key.ExportSubjectPublicKeyInfo());
-        SecurityKey = new ECDsaSecurityKey(key) { KeyId = Base64Url.EncodeToString(publicKeyHash)[..16] };
+        SecurityKey = new ECDsaSecurityKey(key)
+        {
+            KeyId = Base64Url.EncodeToString(publicKeyHash)[..16],
+            // IdentityModel's shared cache is keyed by the public key, not by this object: it would hand a
+            // later instance of the same key (e.g. after a restart in-process) a provider whose ECDsa was disposed.
+            CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false },
+        };
     }
 
     public ECDsaSecurityKey SecurityKey { get; }
