@@ -1,6 +1,6 @@
 # Étape 1.3 — Connexion, jetons d'accès et de renouvellement, déconnexion
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (7 recommandations du § 11 + compléments du § 11.1) — 🟡 en réalisation
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (7 recommandations du § 11 + compléments du § 11.1) — ✅ réalisé le 2026-11-24, **en attente de la validation du porteur**
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.3 **uniquement** : se connecter, garder sa session (renouvellement), se
@@ -316,4 +316,37 @@ Puis envoi de la branche sur GitHub. La sous-étape 1.4 ne commence qu'après ta
 
 ## 14. Écarts constatés pendant la réalisation
 
-*(À remplir pendant la réalisation.)*
+| Prévu | Réalisé | Pourquoi |
+|---|---|---|
+| Dépendance de test `Microsoft.Extensions.TimeProvider.Testing` (horloge simulée) | **Non ajoutée** : les tests d'expiration modifient directement les dates du jeton en base (`expires_at`, `session_expires_at`) | Une dépendance de moins, test aussi probant |
+| `Sessions/LoginEndpoint.cs`, `RefreshEndpoint.cs`, `LogoutEndpoint.cs` | Un seul fichier `Sessions/SessionEndpoints.cs` | Trois routes de quelques lignes, même lecture du corps |
+| — | `Tokens/TokenSigningKey.cs` (lecture et contrôle de la clé, calcul du `kid`) | Isoler la clé et son contrôle au démarrage |
+| Lecture du corps « même lecteur qu'en 1.2 » | **Petit remaniement annoncé** : `Registration/RegistrationRequestReader.cs` devient `Http/StrictJsonReader.cs` (générique) ; `Problem`/`FieldError` déplacés dans `Http/ProblemResults.cs` | Partagé par les 4 routes ; comportement de l'inscription inchangé (tous ses tests passent) |
+| `Accounts/Account.cs` modifié (empreinte modifiable) | **Inchangé** : le ré-hachage est une mise à jour SQL directe, faite **seulement si l'empreinte n'a pas changé entre-temps** | Plus sûr (pas d'écrasement d'un changement simultané) |
+| Contrat : codes d'erreur | Champs `credentials` et `refreshToken` ajoutés à `FieldError.field` ; `/me` 401 **sans corps** (en-tête `WWW-Authenticate: Bearer`) | Comportement standard d'ASP.NET Core pour un jeton Bearer refusé |
+| Tests de contrat | Le banc de test sait maintenant préparer un compte / une session avant un scénario, vérifier les réponses **sans corps** (204, 401) et les **en-têtes documentés** (`Cache-Control: no-store`) | Nécessaire pour couvrir les 4 nouvelles routes |
+| Journal « réutilisation détectée » | Avertissement **seulement** quand une session encore active est coupée ; un jeton d'une session déjà fermée (déconnexion) → simple information | Le lancement réel montrait un faux « vol possible » après une déconnexion |
+
+**Problème trouvé et corrigé pendant les tests :** la librairie de Microsoft garde en cache ses objets de signature,
+indexés par la **clé publique** et non par l'objet clé. Un deuxième noyau démarré avec la même clé (dans les tests ;
+en production, après un redémarrage interne) recevait un objet dont la clé avait été détruite → erreur à chaque
+connexion. Corrigé en désactivant ce cache pour notre clé (`CacheSignatureProviders = false`, coût négligeable) ;
+commit `fix(identity): do not share cached signature providers between key instances`.
+
+**Limite connue (acceptée, client unique) :** une déconnexion envoyée **exactement en même temps** qu'un renouvellement
+de la même session pourrait laisser vivre le nouveau jeton de renouvellement (≤ 7 jours). Notre client n'enverra jamais
+les deux en même temps. À revoir avec la dette « délai de grâce » (mobile/VR).
+
+Version retenue : `Microsoft.AspNetCore.Authentication.JwtBearer` **10.0.15** (aligné sur le runtime ASP.NET Core 10.0.15).
+
+### Résultats et constats
+
+| Point | Résultat |
+|---|---|
+| Tests | **168 passent** (70 unitaires du module + 98 intégration/contrat ; 102 avant la 1.3), build 0 avertissement, `dotnet format` propre |
+| Tests de mutation | Révocation de session retirée → 2 tests échouent ; audience non vérifiée → 2 ; expiration non exigée → 1 ; `MapInboundClaims = true` → 3 ; pas d'empreinte factice pour un e-mail inconnu → 1 ; pas de ré-hachage → 1. **Les 6 mutations sont détectées** |
+| Lancement réel | `new-signing-key.ps1` (clé écrite dans `.env`, non affichée ; 2e appel : conservée) ; `migrate.ps1` crée `identity.refresh_tokens` ; noyau lancé par `run-core.ps1`. Par `curl` : connexion 200 + `Cache-Control: no-store` ; jeton décodé : `{alg: ES256, kid, typ: JWT}` et `{aud: eudoria-core, iss: eudoria-core, exp, iat, sub, jti}` ; `/me` 200 ; `/me` sans jeton → 401 + `WWW-Authenticate: Bearer` ; jeton modifié → 401 ; mauvais mot de passe → 401 `invalid_credentials` ; renouvellement 200 ; réutilisation de l'ancien jeton → 401 **et** le jeton récent ne marche plus ; déconnexion 204 puis renouvellement → 401 |
+| Ré-hachage en réel | Compte de test dont l'empreinte est remplacée par une empreinte à l'ancien coût (`m=19456,t=2`) → connexion 200 → empreinte en base devenue `m=65536,t=3` ; reconnexion 200 |
+| Comptes de la 1.2 | 6 comptes locaux sont encore à l'ancien coût (mots de passe inconnus de Claude) : ils seront ré-hachés à leur première connexion |
+| « Même durée » e-mail inconnu / mauvais mot de passe | 3 séries de 7 mesures à chaud : médianes **96 / 95 ms**, **101 / 100 ms**, **101 / 106 ms** → écarts −1,3 / −0,3 / +4,7 ms, **sans direction constante** (bruit) |
+| Journaux | Ni e-mail, ni mot de passe, ni jeton (test dédié + vérification du journal réel) |

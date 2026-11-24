@@ -165,7 +165,7 @@ Le détail interne de chaque dossier sera défini à l'étape qui le crée.
 - Hébergement des serveurs (Linux), déploiement, observabilité → avant toute mise en ligne publique.
 - Mécanisme de distribution du contenu des mondes (paquets par monde) → étape 6.
 
-## 8. Le noyau aujourd'hui (étape 1.2)
+## 8. Le noyau aujourd'hui (étape 1.3)
 
 ```
 global.json                      # SDK .NET 11 épinglé ; lanceur de tests Microsoft.Testing.Platform
@@ -175,32 +175,40 @@ global.json                      # SDK .NET 11 épinglé ; lanceur de tests Micr
 shared/api/core-v1.yaml          # contrat OpenAPI public v1 — écrit AVANT le code
 tools/dev/
 ├── docker-compose.yml           # PostgreSQL 18.7, publié sur 127.0.0.1 uniquement
-├── DotEnv.ps1                   # lecture de .env + chaîne de connexion en mémoire (partagés par les scripts)
+├── DotEnv.ps1                   # lecture de .env + chaîne de connexion et clé de signature en mémoire (partagés)
+├── new-signing-key.ps1          # génère la clé ES256 des jetons d'accès dans .env (jamais affichée)
+├── NewSigningKey.cs             # petit programme C# « fichier unique » appelé par le script ci-dessus
 ├── start-db.ps1                 # démarre / arrête la base (-Stop)
 ├── migrate.ps1                  # applique les migrations de chaque module (geste volontaire, jamais au démarrage)
-└── run-core.ps1                 # lance le noyau, chaîne de connexion construite en mémoire
+└── run-core.ps1                 # lance le noyau, chaîne de connexion et clé passées en mémoire
 core/
 ├── Eudoria.Core.slnx            # solution
 ├── Directory.Build.props        # net10.0, avertissements = erreurs, analyse figée sur .NET 10
 ├── Directory.Packages.props     # TOUTES les versions de paquets, au même endroit
 ├── src/Eudoria.Core.Api/        # hôte ASP.NET Core (Minimal APIs)
-│   ├── Program.cs               # démarrage ; assemble les modules ; routes publiques sous /v1
+│   ├── Program.cs               # démarrage ; assemble les modules ; authentification ; routes publiques sous /v1
+│   ├── appsettings.json         # réglages non secrets (durées des jetons, émetteur, audience)
 │   ├── Database/                # options + source de données PostgreSQL (Npgsql), partagée par les modules
 │   └── Health/                  # /v1/health/live et /v1/health/ready
-├── src/Eudoria.Core.Identity/   # module Identité (comptes) — seule partie publique : IdentityModule
-│   ├── IdentityModule.cs        # AddIdentityModule() / MapIdentityEndpoints()
-│   ├── Accounts/                # entité Account ; règles et normalisation (e-mail, pseudo, mot de passe NFKC)
-│   ├── Passwords/               # IPasswordHasher ; Argon2id via NSec (libsodium), format PHC
-│   ├── Registration/            # POST /v1/accounts : lecture stricte du corps, service d'inscription
-│   └── Persistence/             # EF Core : IdentityDbContext (schéma « identity »), configuration, Migrations/
+├── src/Eudoria.Core.Identity/   # module Identité (comptes, sessions, jetons) — seule partie publique : IdentityModule
+│   ├── IdentityModule.cs        # AddIdentityModule() / MapIdentityEndpoints() ; vérification stricte des jetons Bearer
+│   ├── Accounts/                # entité Account ; règles et normalisation (e-mail, pseudo, mot de passe NFKC) ; codes d'erreur
+│   ├── Passwords/               # IPasswordHasher ; Argon2id via NSec (libsodium), format PHC ; détection « à ré-hacher »
+│   ├── Http/                    # lecture stricte des corps JSON ; réponses d'erreur Problem Details
+│   ├── Registration/            # POST /v1/accounts : service d'inscription
+│   ├── Tokens/                  # options, clé de signature ES256, émission des JWT, jeton de renouvellement (entité + valeur)
+│   ├── Sessions/                # POST /v1/auth/login, /refresh, /logout : connexion, rotation, révocation
+│   ├── Profile/                 # GET /v1/me (route protégée)
+│   └── Persistence/             # EF Core : IdentityDbContext (schéma « identity »), configurations, Migrations/
 └── tests/
-    ├── Eudoria.Core.Identity.Tests/  # unitaires : règles, NFKC, Argon2id (dont coût réel mesuré)
+    ├── Eudoria.Core.Identity.Tests/  # unitaires : règles, NFKC, Argon2id (coût réel mesuré, ré-hachage), clé, JWT, jeton de renouvellement
     └── Eudoria.Core.Api.Tests/
         ├── HealthEndpointsTests.cs   # comportement des routes santé
         ├── RegistrationTests.cs      # inscription de bout en bout, concurrence, journaux, migrations à jour
+        ├── SessionTests.cs           # connexion, /me, jetons falsifiés, rotation, vol, expirations, déconnexion, concurrence
         ├── ContractTests.cs          # le noyau respecte core-v1.yaml, dans les deux sens
         ├── SchemaValidatorTests.cs   # le validateur maison rejette bien ce qu'il prétend vérifier
-        └── Infrastructure/           # noyau en mémoire, PostgreSQL jetable migrée, capture des journaux
+        └── Infrastructure/           # noyau en mémoire (clé de signature jetable), PostgreSQL jetable migrée, capture des journaux
 ```
 
 - **Exécution :** le programme cible `net10.0` et tourne sur le runtime **.NET 10 LTS** (ADR-0001) ; le SDK 11
@@ -215,8 +223,28 @@ core/
 - **Inscription :** `POST /v1/accounts` → 202 (créé, **ou** e-mail déjà utilisé : indiscernable exprès), 400 / 409 en
   Problem Details (RFC 9457) avec un code machine par erreur. Mot de passe normalisé NFKC avant contrôle et hachage.
   Ni l'e-mail ni le mot de passe ne sont journalisés.
+- **Sessions (`identity.refresh_tokens`) :** une ligne par jeton de renouvellement : `id`, `account_id` (clé étrangère,
+  suppression en cascade), `family_id` (= une session, toutes les rotations d'une connexion), `token_hash` (**SHA-256**
+  unique : la valeur du jeton n'est jamais stockée), `created_at`, `expires_at` (7 jours), `session_expires_at`
+  (30 jours après la connexion), `revoked_at`.
+- **Connexion :** `POST /v1/auth/login` → 200 avec une paire de jetons (`Cache-Control: no-store`), ou 401
+  `invalid_credentials` identique pour un e-mail inconnu et un mauvais mot de passe (vérification contre une empreinte
+  factice dans le premier cas, même durée). Une empreinte à un ancien coût Argon2id est **ré-hachée** au coût actuel.
+- **Jeton d'accès :** JWT signé **ES256** (ECDSA P-256), 15 min, en-tête `alg`/`kid`/`typ`, revendications `sub` (UUID du
+  compte), `iss` et `aud` = `eudoria-core`, `iat`, `exp`, `jti` — rien d'autre. Vérifié sans base de données : ES256
+  seul, notre clé, notre émetteur, audience `eudoria-core` seule, signature et expiration obligatoires, 30 s de
+  tolérance d'horloge, revendications gardées telles quelles (`MapInboundClaims = false`). **Il n'est accepté que par
+  le noyau** : les serveurs de monde recevront leur propre ticket d'entrée (à concevoir en 1.6).
+- **Renouvellement :** `POST /v1/auth/refresh` consomme le jeton (rotation) et en remet un nouveau dans la même session,
+  de façon atomique (transaction + verrou de ligne). Un jeton **déjà consommé** présenté à nouveau révoque **toute la
+  session** (signe de vol ; version stricte, décision du porteur). `POST /v1/auth/logout` révoque la session et répond
+  toujours 204. Le jeton d'accès déjà remis reste valable jusqu'à son expiration (≤ 15 min).
+- **Profil :** `GET /v1/me` (jeton d'accès obligatoire) → `id`, `pseudo`, `createdAt` (pas l'e-mail) ; sinon 401 avec
+  `WWW-Authenticate: Bearer`.
 - **Configuration :** la chaîne de connexion vient de `ConnectionStrings:Core` (variable d'environnement
-  `ConnectionStrings__Core`). Sans elle, le noyau **refuse de démarrer**.
+  `ConnectionStrings__Core`) et la clé de signature de `Identity:Tokens:SigningKey` (variable
+  `Identity__Tokens__SigningKey`, lue dans `.env` par `run-core.ps1`). Sans l'une ou l'autre, le noyau **refuse de démarrer**.
+  Les autres réglages des jetons (durées, émetteur, audience) sont dans `appsettings.json`.
 - **Santé :** `live` ne touche à rien (le processus répond) ; `ready` exécute `SELECT 1` sur PostgreSQL avec
   un délai maximum de 2 s et répond 503 sinon. Aucune réponse ne contient de détail interne : les causes
   sont dans les journaux du serveur seulement.

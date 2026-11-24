@@ -94,6 +94,7 @@ Prérequis : Docker Desktop **démarré**. Depuis la racine du dépôt, dans Pow
 
 ```powershell
 Copy-Item .env.example .env       # une seule fois, puis remplacer le mot de passe dans .env
+.\tools\dev\new-signing-key.ps1   # une seule fois (depuis 1.3) : clé de signature des jetons, écrite dans .env sans être affichée
 .\tools\dev\start-db.ps1          # démarre PostgreSQL (attend qu'il soit prêt)
 .\tools\dev\migrate.ps1           # applique les migrations manquantes (à relancer après chaque nouvelle migration)
 .\tools\dev\run-core.ps1          # démarre le noyau sur http://localhost:5080
@@ -106,6 +107,16 @@ Créer un compte (exemple) :
 Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/accounts -ContentType 'application/json' -Body '{"email":"ana@example.com","pseudo":"Ana_42","password":"une-phrase-de-passe-longue"}'
 ```
 → `status : accepted`. Rejouer la même commande → erreur 409 (`pseudo_taken`).
+
+Se connecter, consulter son profil, renouveler, se déconnecter (depuis 1.3) :
+
+```powershell
+$session = Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/auth/login -ContentType 'application/json' -Body '{"email":"ana@example.com","password":"une-phrase-de-passe-longue"}'
+Invoke-RestMethod -Uri http://localhost:5080/v1/me -Headers @{ Authorization = "Bearer $($session.accessToken)" }
+$session = Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/auth/refresh -ContentType 'application/json' -Body (@{ refreshToken = $session.refreshToken } | ConvertTo-Json)
+Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/auth/logout -ContentType 'application/json' -Body (@{ refreshToken = $session.refreshToken } | ConvertTo-Json)
+```
+→ `/me` renvoie `id`, `pseudo`, `createdAt`. Après la déconnexion, `refresh` avec le même jeton → 401.
 
 Arrêter : `Ctrl+C` pour le noyau, `.\tools\dev\start-db.ps1 -Stop` pour la base (les données sont conservées).
 
@@ -123,6 +134,10 @@ Notes :
 - Le cache NuGet est sur E: grâce à la variable utilisateur `NUGET_PACKAGES` ; un terminal ouvert avant sa création
   ne la voit pas (les paquets iraient sur C:) : ouvrir un nouveau terminal.
 - Les tests créent leur propre base PostgreSQL jetable (Testcontainers) : ils n'utilisent pas celle de `start-db.ps1`.
+- La clé de signature (`IDENTITY_TOKEN_SIGNING_KEY`) est secrète : ne jamais la copier ailleurs que dans `.env`.
+  La remplacer (`new-signing-key.ps1 -Force`) oblige tout le monde à se reconnecter. Sans elle, le noyau refuse de démarrer.
+- `new-signing-key.ps1` compile un petit programme C# à la volée (`dotnet run --file`) ; le SDK range ce résultat
+  (environ 9 Mo) dans `%TEMP%\dotnet\runfile` sur C: (supprimable).
 - `run-core.ps1` vise `127.0.0.1` et non `localhost` : `localhost` se résout d'abord en IPv6 (`::1`), où la base
   n'écoute pas, et Windows met environ 2 s à abandonner, soit tout le délai du contrôle de santé.
 

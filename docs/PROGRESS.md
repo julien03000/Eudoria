@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-24
+**Dernière mise à jour :** 2026-11-24 (sous-étape 1.3 réalisée)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -48,6 +48,17 @@
     en 5.8, reçoit `MaxParallelActions` et lit `MemoryPerActionBytes` → **inutile de désactiver l'UBA**.
     Confirmation pratique (nombre de tâches parallèles dans le journal d'UBT) à la première compilation (1.5).
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
+- **Plan de la sous-étape 1.3 validé** le 2026-11-24 (7 recommandations + compléments du porteur : audience `eudoria-core`,
+  `MapInboundClaims = false`, `RequireSignedTokens` / `RequireExpirationTime` explicites, version stricte de la rotation).
+- **Sous-étape 1.3 réalisée le 2026-11-24 — en attente de validation par le porteur** (`docs/plans/etape-01-3.md`, § 14) :
+  - contrat core-v1 **1.2.0** : `POST /v1/auth/login`, `/v1/auth/refresh`, `/v1/auth/logout`, `GET /v1/me` ;
+  - jeton d'accès **JWT ES256** 15 min (audience `eudoria-core`) ; jeton de renouvellement aléatoire, **empreinte SHA-256**
+    en base (`identity.refresh_tokens`, migration `CreateRefreshTokens`), rotation à chaque usage, 7 jours / session 30 jours,
+    réutilisation = session révoquée ; déconnexion = session révoquée ;
+  - **ré-hachage à la connexion** des empreintes Argon2id à l'ancien coût (prouvé en réel) ;
+  - clé de signature dans `.env`, générée par `tools/dev/new-signing-key.ps1` (fait sur ton poste, jamais affichée) ;
+  - **168 tests passent**, 6 tests de mutation détectés, build 0 avertissement, format propre ; lancement réel vérifié ;
+  - un défaut de cache de la librairie de Microsoft trouvé et corrigé (§ 14 du plan).
 - **Plan de la sous-étape 1.2 validé** le 2026-11-24 (choix du porteur : § 9.1 du plan ; NSec vérifié : MIT, maintenu).
 - **Sous-étape 1.2 réalisée et ✅ validée par le porteur le 2026-11-24** :
   - contrat `POST /v1/accounts` (core-v1 1.1.0) ; module `Eudoria.Core.Identity` (règles, NFKC, Argon2id via NSec,
@@ -95,7 +106,12 @@
 - **Dette (décision du porteur, 2026-11-24, plan 1.3)** : renouvellement strict — si la réponse d'un renouvellement est
   perdue (réseau instable) et que le client réessaie, la session est coupée. Prévoir un éventuel **délai de grâce**
   quand les clients mobile et VR arriveront.
-- Comptes créés en 1.2 avec l'ancien coût Argon2id (19 Mio / 2 passes) : seront ré-hachés à la connexion en 1.3.
+- Comptes créés en 1.2 avec l'ancien coût Argon2id (19 Mio / 2 passes) : **ré-hachés automatiquement à leur prochaine
+  connexion** (mécanisme livré en 1.3) ; 6 comptes locaux concernés.
+- **Pas encore de limitation des tentatives de connexion** (prévue en 1.4) : le noyau ne doit tourner qu'en local d'ici là.
+- **Dette (1.3)** : les jetons de renouvellement expirés ne sont jamais supprimés de la table (nettoyage à prévoir) ;
+  une déconnexion simultanée à un renouvellement de la même session peut laisser vivre le nouveau jeton (cas théorique).
+- `new-signing-key.ps1` laisse ~9 Mo de compilation dans `%TEMP%\dotnet\runfile` (C:, supprimable).
 - **Sauvegarde** : le dépôt est sur GitHub ; la seconde sauvegarde indépendante recommandée par l'ADR-0006 (disque externe) n'est pas encore en place.
 - Quota LFS gratuit de GitHub : 10 Gio de stockage et 10 Gio de téléchargement par mois — à surveiller dès l'arrivée des premiers assets.
 - **.NET** : Visual Studio 18.12 a installé le SDK **11** (et non 10). Le runtime .NET 10 LTS est présent et le SDK 11 compile pour net10.0 : conforme à l'ADR-0001. Décision (2026-11-24) : SDK 11 épinglé par `global.json`, cible `net10.0`.
@@ -107,6 +123,8 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Sur demande du porteur seulement : proposer le plan de la **sous-étape 1.3** (connexion, jetons d'accès et de
-   renouvellement, déconnexion, **ré-hachage à la connexion** des empreintes Argon2id à l'ancien coût), l'écrire dans
-   `docs/plans/etape-01-3.md` et attendre le « OK ». **Ne pas commencer la 1.3 sans son accord.**
+1. **Le porteur valide la sous-étape 1.3** (il peut rejouer le scénario de `docs/SETUP.md` § « Lancer le noyau en local » :
+   connexion, `/me`, renouvellement, déconnexion).
+2. Ensuite seulement, sur sa demande : proposer le plan de la **sous-étape 1.4** (limitation des tentatives, validations,
+   changement de mot de passe + « déconnecter tous mes appareils », reports de la 1.2), l'écrire dans
+   `docs/plans/etape-01-4.md` et attendre le « OK ». **Ne pas commencer la 1.4 sans son accord.**
