@@ -1,4 +1,5 @@
 using Eudoria.Core.Identity.Accounts;
+using Eudoria.Core.Identity.Tokens;
 using Microsoft.EntityFrameworkCore;
 
 namespace Eudoria.Core.Identity.Persistence;
@@ -11,9 +12,12 @@ internal sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> opti
 
     public DbSet<Account> Accounts => Set<Account>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfiguration(new AccountConfiguration());
+        modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
     }
 }
