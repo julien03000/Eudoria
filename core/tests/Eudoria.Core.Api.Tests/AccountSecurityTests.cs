@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Eudoria.Core.Api.Tests.Infrastructure;
 using Eudoria.Core.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Eudoria.Core.Api.Tests;
 
@@ -251,6 +252,36 @@ public sealed class AccountSecurityTests(PostgresFixture database)
         }
 
         Array.ForEach(renewed, response => response.Dispose());
+    }
+
+    [Fact]
+    public async Task RevokeAll_WhileARenewalIsAboutToCommit_WaitsForIt_AndRevokesItsNewToken()
+    {
+        PausingCommitInterceptor interceptor = new();
+        await using CoreApiFactory factory = new(database.ConnectionString,
+            configureServices: services => services.ConfigureDbContext<IdentityDbContext>(options => options.AddInterceptors(interceptor)));
+        using HttpClient client = factory.CreateClient();
+        (string email, _) = await SessionTests.RegisterAsync(client);
+        JsonNode device = await SessionTests.LoginJsonAsync(client, email);
+        JsonNode other = await SessionTests.LoginJsonAsync(client, email);
+        Guid accountId = Guid.Parse((await SessionTests.ReadJsonAsync(await SessionTests.GetMeAsync(client, Access(device))))["id"]!.GetValue<string>());
+
+        // The renewal has consumed its token and written the new one, but not committed yet.
+        interceptor.PauseNextCommit();
+        Task<HttpResponseMessage> renewal = SessionTests.RefreshAsync(client, Refresh(device));
+        await interceptor.Reached.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+
+        Task<HttpResponseMessage> revokeAll = RevokeAllAsync(client, Access(other));
+        Task first = await Task.WhenAny(revokeAll, Task.Delay(TimeSpan.FromMilliseconds(500), Cancellation));
+        Assert.NotSame(revokeAll, first); // "revoke all" waits for the renewal (account row locked)
+        interceptor.Release();
+
+        using HttpResponseMessage renewed = await renewal;
+        using HttpResponseMessage revoked = await revokeAll;
+        Assert.Equal(HttpStatusCode.OK, renewed.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, revoked.StatusCode);
+        await using IdentityDbContext identity = database.CreateIdentityDbContext();
+        Assert.False(await identity.RefreshTokens.AnyAsync(token => token.AccountId == accountId && token.RevokedAt == null, Cancellation));
     }
 
     internal static string Access(JsonNode tokens) => tokens["accessToken"]!.GetValue<string>();
