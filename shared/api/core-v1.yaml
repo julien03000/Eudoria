@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: EUDORIA Core — Public API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Public API of the EUDORIA core (clients). Contract-first: this file is written
     before the code and the core is tested against it (ADR-0001).
@@ -12,6 +12,8 @@ servers:
 tags:
   - name: health
     description: Liveness and readiness probes.
+  - name: accounts
+    description: EUDORIA identities (accounts).
 paths:
   /health/live:
     get:
@@ -53,8 +55,143 @@ paths:
                 $ref: '#/components/schemas/HealthStatus'
               example:
                 status: unavailable
+  /accounts:
+    post:
+      tags: [accounts]
+      operationId: registerAccount
+      summary: Registers a new EUDORIA account.
+      description: |
+        Creates an account from an e-mail, a unique public pseudo and a password.
+
+        To avoid revealing whether an e-mail address already has an account, an e-mail that
+        is already in use gets exactly the same 202 response as a successful registration
+        (same body, comparable duration); no second account is created. The pseudo is public,
+        so a taken pseudo is reported (409).
+
+        Server-side rules (all errors are returned together):
+        - email: surrounding whitespace removed, lower-cased; at most 254 characters; one '@'
+          with a non-empty local part and a domain containing a dot; no whitespace or control character.
+        - pseudo: 3 to 20 characters among A-Z, a-z, 0-9, '_' and '-', starting with a letter;
+          unique regardless of letter case.
+        - password: normalized to Unicode NFKC first, then 12 to 128 characters (Unicode code points);
+          every character is allowed, no composition rule.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAccountRequest'
+            example:
+              email: ana@example.com
+              pseudo: Ana_42
+              password: a-long-enough-passphrase
+      responses:
+        '202':
+          description: |
+            Registration accepted: the account was created, or the e-mail was already in use
+            (indistinguishable on purpose).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationAccepted'
+              example:
+                status: accepted
+        '400':
+          description: The request body or one of its fields is invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                errors:
+                  - field: pseudo
+                    code: pseudo_too_short
+                  - field: password
+                    code: password_too_short
+        '409':
+          description: The pseudo is already taken (letter case ignored).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Conflict
+                status: 409
+                errors:
+                  - field: pseudo
+                    code: pseudo_taken
 components:
   schemas:
+    RegisterAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [email, pseudo, password]
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        pseudo:
+          type: string
+          minLength: 3
+          maxLength: 20
+          pattern: '^[A-Za-z][A-Za-z0-9_-]{2,19}$'
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: Counted in Unicode code points after NFKC normalization.
+    RegistrationAccepted:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted]
+    Problem:
+      type: object
+      description: RFC 9457 problem details, with one machine-readable code per error.
+      additionalProperties: false
+      required: [type, title, status, errors]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, code]
+      properties:
+        field:
+          type: string
+          enum: [body, email, pseudo, password]
+          description: "'body' when the request as a whole is unreadable (not JSON, unknown or duplicate property, wrong type, too large)."
+        code:
+          type: string
+          enum:
+            - body_invalid
+            - email_required
+            - email_invalid
+            - pseudo_required
+            - pseudo_too_short
+            - pseudo_too_long
+            - pseudo_invalid_characters
+            - pseudo_must_start_with_letter
+            - pseudo_taken
+            - password_required
+            - password_too_short
+            - password_too_long
     HealthStatus:
       type: object
       additionalProperties: false
