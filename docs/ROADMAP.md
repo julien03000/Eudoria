@@ -32,8 +32,9 @@ Légende : ⚪ À faire · 🟡 En cours · 🟢 Validée
 **Critères de validation :**
 - Le dépôt git existe sur `main`, avec `.gitignore` et `.gitattributes`.
 - `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md` existent.
-- Les 4 ADR (backend, base de données, moteur client, réseau) sont **validés** par le porteur de projet.
+- Les 5 ADR (backend, base de données, moteur client, réseau, fichiers binaires) sont **validés** par le porteur de projet.
 - `CLAUDE.md` est mis à jour (sections « Stack technique » et « Structure du dépôt »).
+- Les outils de `docs/SETUP.md` nécessaires à l'étape 1 sont installés (après validation des ADR).
 
 ---
 
@@ -53,7 +54,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 - Changement de mot de passe.
 - Un **identifiant interne stable** (UUID) par compte, distinct du pseudo et de l'e-mail : c'est lui que tous les autres systèmes utiliseront.
 - Un mécanisme permettant à un autre service (futur serveur de monde) de **vérifier qu'un jeton est valide** sans redemander le mot de passe.
-- Un **client PC minimal** (écran de connexion / création de compte dans le moteur choisi) qui parle au noyau.
+- Un **client Unreal minimal** pour PC (écrans de connexion / création de compte) qui parle au noyau en HTTPS.
 
 **Exclus (étapes ultérieures ou plus tard) :**
 - Avatar (étape 2), connexion via Google/Discord/etc., double authentification,
@@ -73,15 +74,21 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 1. **Service Identité** du noyau, exposant une API **versionnée** (`/v1/...`) :
    inscription, connexion, renouvellement, déconnexion, profil, changement de mot de passe.
 2. **Schéma de base de données** des comptes, géré par des **migrations** versionnées.
-3. **Client PC minimal** : écrans « Créer un compte » et « Se connecter », puis un écran
-   « Bienvenue, <pseudo> » qui prouve que la session fonctionne.
+3. **Client Unreal minimal** (UE 5.8, version du lanceur) :
+   - projet Unreal créé dans `unreal/`, en **C++**, avec le plugin socle `EudoriaCore` ;
+   - écrans « Créer un compte » et « Se connecter », puis un écran « Bienvenue, <pseudo> » qui prouve que la session fonctionne ;
+   - logique (appels HTTP, gestion du jeton, erreurs) **en C++** ; les Widget Blueprints ne font que la mise en page de classes C++ ;
+   - création des assets de base par **scripts Python** de l'éditeur quand c'est possible ;
+   - jeton conservé uniquement en mémoire pendant la session (pas de stockage en clair sur disque).
 4. **Environnement de développement reproductible** : une commande pour lancer la base de données
    et le noyau en local (probablement via Docker Compose — à confirmer).
-5. **Tests automatisés** : unitaires (règles de validation, hachage) et d'intégration (API complète contre une vraie base de test).
-6. **Documentation** : contrat de l'API (format OpenAPI, texte), mise à jour de `ARCHITECTURE.md` et `PROGRESS.md`.
+5. **Tests automatisés** : unitaires (règles de validation, hachage) et d'intégration (API complète contre une vraie base de test) côté noyau ; tests d'automatisation Unreal pour la partie C++ du client (appel au noyau, gestion des erreurs).
+6. **Documentation** : contrat de l'API (OpenAPI, `shared/api/`), mise à jour de `ARCHITECTURE.md` et `PROGRESS.md`.
+7. **Mise en place technique** : Git LFS activé dans le dépôt, cache de données dérivées d'Unreal déplacé sur E:.
 
 ### Critères de validation
-- [ ] Je peux créer un compte depuis le client PC, puis me connecter avec.
+- [ ] Je peux créer un compte depuis le client Unreal sur PC, puis me connecter avec.
+- [ ] Le client Unreal ne contient aucune logique dans les graphes Blueprint (vérifié par script).
 - [ ] Deux comptes ne peuvent pas avoir le même pseudo ni le même e-mail.
 - [ ] Un mauvais mot de passe est refusé ; après N échecs, les tentatives sont temporairement bloquées.
 - [ ] Le mot de passe n'apparaît en clair ni en base, ni dans les logs.
@@ -96,21 +103,27 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 2. Modèle de compte + migrations + inscription.
 3. Connexion, jetons, renouvellement, déconnexion.
 4. Protections (limitation des tentatives, validations).
-5. Client PC minimal.
+5. Création du projet Unreal (C++, plugin socle, Git LFS) et client minimal.
 6. Vérification de jeton par un service tiers.
 
 ---
 
 ## Étape 2 — Création et personnalisation des avatars
 
-**Objectif :** chaque identité possède **un avatar unique** qu'elle peut personnaliser.
-**Livrable :** éditeur d'avatar dans le client PC (apparence de base, couleurs, quelques vêtements) ; l'avatar est stocké par le noyau et rattaché au compte.
-**Validation :** je personnalise mon avatar, je me reconnecte depuis un autre poste, je retrouve exactement le même avatar.
+**Objectif :** chaque identité possède **un avatar unique**, photoréaliste, qu'elle peut personnaliser.
+**Première tâche — évaluation de MetaHuman** (courte étude avec prototype, conclue par un ADR) :
+personnalisation possible **par le joueur, dans le jeu** (et pas seulement dans l'outil de création),
+coût en performances avec plusieurs avatars à l'écran, déclinaison VR/mobile (niveaux de détail bas),
+taille des assets (impact sur le quota Git LFS, ADR-0005), conditions de licence ; et, si MetaHuman ne
+convient pas, alternatives.
+**Livrable :** éditeur d'avatar dans le client Unreal (apparence de base, couleurs, quelques vêtements) ; les paramètres de l'avatar sont stockés par le noyau et rattachés au compte.
+**Validation :** l'ADR avatar est validé ; je personnalise mon avatar, je me reconnecte depuis un autre poste, je retrouve exactement le même avatar.
 
 ## Étape 3 — Premier environnement multijoueur
 
 **Objectif :** plusieurs personnes connectées se voient dans un même lieu.
-**Livrable :** un premier serveur de monde (une place simple) qui accepte les joueurs authentifiés par le noyau et affiche leurs avatars.
+**Prérequis technique :** **compilation d'Unreal 5.8 depuis les sources** (obligatoire pour les serveurs dédiés, ADR-0004 ; ~150 à 350 Go sur E:, liaison des comptes Epic et GitHub).
+**Livrable :** un premier serveur dédié Unreal (une place simple, Windows en local) qui accepte les joueurs authentifiés par le noyau et affiche leurs avatars.
 **Validation :** deux clients PC rejoignent le même monde et voient l'avatar de l'autre ; un client sans jeton valide est refusé.
 
 ## Étape 4 — Déplacements et interactions
@@ -118,6 +131,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 **Objectif :** se déplacer et interagir de façon fluide, avec le **serveur qui fait autorité**.
 **Livrable :** déplacement à pied synchronisé (prédiction côté client, correction serveur), discussion textuelle de proximité, interactions simples (emotes, objets).
 **Validation :** déplacements fluides avec latence simulée ; une triche de vitesse côté client est corrigée par le serveur.
+**En fin d'étape :** test d'export sur Meta Quest / Android, pour mesurer tôt le coût du rendu sur ces plateformes (ADR-0003).
 
 ## Étape 5 — Sauvegarde et persistance
 
@@ -128,7 +142,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 ## Étape 6 — Connexion entre plusieurs mondes
 
 **Objectif :** plusieurs mondes indépendants reliés au même noyau.
-**Livrable :** registre des mondes dans le noyau, deux mondes distincts, un portail pour passer de l'un à l'autre en gardant identité et avatar.
+**Livrable :** registre des mondes dans le noyau, deux mondes distincts (un plugin Game Feature chacun, un serveur dédié chacun), un portail pour passer de l'un à l'autre en gardant identité et avatar ; serveurs Linux (compilation croisée) prêts pour l'hébergement.
 **Validation :** je passe d'un monde à l'autre par un portail ; chaque monde peut être arrêté/mis à jour sans faire tomber l'autre.
 
 ## Étape 7 — Premières activités et expériences

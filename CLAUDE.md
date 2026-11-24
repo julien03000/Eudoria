@@ -64,6 +64,17 @@ ce qui est fait, ce qui est en cours, les problèmes connus, et **la prochaine �
 ## Stack technique
 À définir — voir `docs/decisions/`. Mets à jour cette section quand un ADR est validé.
 
+## Environnement
+- **Règle d'installation : tout sur E:.** Le disque C: n'a qu'environ 50 Go libres ; seuls les composants
+  qui l'exigent y vont (Visual Studio en installe une partie de force, estimée à 8–12 Go).
+  Les caches (Unreal DDC/Zen, Docker, Fab, SDK Android) doivent être redirigés vers E:.
+  Ne rien installer sans mon accord. Détail des outils et tailles : `docs/SETUP.md`.
+- **Unreal Engine 5.8.4** (version du lanceur Epic) : `E:\Epic Games\UE_5.8`
+  - Éditeur : `E:\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe`
+  - Python de l'éditeur : `E:\Epic Games\UE_5.8\Engine\Binaries\ThirdParty\Python3\Win64\python.exe`
+- **Git 2.56.1** (+ Git LFS 3.8.1) : `C:\Program Files\Git\cmd\git.exe` (peut être absent du PATH des sessions déjà ouvertes).
+- Poste : Windows 11, Ryzen 9 3900X (12 cœurs), **16 Go de RAM** (Epic en recommande 32), Radeon RX 9060 XT.
+
 ## Structure du dépôt
 À définir en Phase 0. Mets à jour cette section quand elle est validée.
 

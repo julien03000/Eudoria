@@ -1,7 +1,7 @@
 # =========================================================
 # EUDORIA — .gitignore
-# Generic rules only. Stack-specific rules (engine, backend
-# language, etc.) will be added once the related ADRs are accepted.
+# Generic rules + Unreal Engine rules (ADR-0005).
+# Backend-specific rules (.NET or Go) will be added once ADR-0001 is accepted.
 # =========================================================
 
 # --- Secrets & local environment (NEVER commit) ---
@@ -35,16 +35,47 @@ $RECYCLE.BIN/
 !.vscode/extensions.json
 !.vscode/launch.json
 .idea/
+.vs/
 *.swp
 *.swo
 *.sublime-workspace
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+*.suo
+*.user
 
-# --- Build outputs, dependencies, caches ---
-build/
-dist/
-out/
-tmp/
-temp/
+# --- Unreal Engine: generated files (never versioned) ---
+# Applies to the project root and to every plugin.
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+**/Plugins/**/Binaries/
+**/Plugins/**/Intermediate/
+# Generated IDE project files (regenerated from the .uproject)
+*.sln
+*.slnx
+*.xcworkspace
+*.xcodeproj
+.vsconfig
+# Packaged builds
+Build/**/*.pak
+ArchivedBuilds/
+Packaged/
+# Crash reports & profiling captures
+*.dmp
+*.utrace
+
+# --- Generic build outputs, dependencies, caches ---
+# Root-only on purpose: an Unreal project has its own "Build/" folder (icons,
+# platform settings) that MUST be versioned, and git on Windows ignores case.
+/build/
+/dist/
+/out/
+/tmp/
+/temp/
 *.tmp
 
 # --- Logs ---
