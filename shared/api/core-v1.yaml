@@ -1,0 +1,65 @@
+openapi: 3.1.1
+info:
+  title: EUDORIA Core — Public API
+  version: 1.0.0
+  description: |
+    Public API of the EUDORIA core (clients). Contract-first: this file is written
+    before the code and the core is tested against it (ADR-0001).
+    Every path below is relative to the server URL, which carries the major version (/v1).
+servers:
+  - url: http://localhost:5080/v1
+    description: Local development only (HTTPS is mandatory everywhere else).
+tags:
+  - name: health
+    description: Liveness and readiness probes.
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: getHealthLive
+      summary: Liveness probe — the core process is running.
+      description: Never touches the database or any other dependency.
+      responses:
+        '200':
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: ok
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: getHealthReady
+      summary: Readiness probe — the core can serve requests (database reachable).
+      description: |
+        Returns 503 when a required dependency is unavailable. The response never
+        contains internal details (error messages, host names).
+      responses:
+        '200':
+          description: The core is ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: ok
+        '503':
+          description: A required dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: unavailable
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
