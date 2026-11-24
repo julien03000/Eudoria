@@ -1,7 +1,6 @@
 # =========================================================
 # EUDORIA — .gitignore
-# Generic rules + Unreal Engine rules (ADR-0005).
-# Backend-specific rules (.NET or Go) will be added once ADR-0001 is accepted.
+# Generic rules + Unreal Engine rules (ADR-0005) + .NET rules (ADR-0001).
 # =========================================================
 
 # --- Secrets & local environment (NEVER commit) ---
@@ -55,8 +54,9 @@ DerivedDataCache/
 **/Plugins/**/Binaries/
 **/Plugins/**/Intermediate/
 # Generated IDE project files (regenerated from the .uproject)
-*.sln
-*.slnx
+# Scoped to unreal/: the core's .NET solution (core/*.slnx) MUST be versioned.
+/unreal/*.sln
+/unreal/*.slnx
 *.xcworkspace
 *.xcodeproj
 .vsconfig
@@ -77,6 +77,15 @@ Packaged/
 /tmp/
 /temp/
 *.tmp
+
+# --- .NET (core/, ADR-0001) ---
+# Capitalised "Binaries/" above is Unreal's; on Windows git ignores case, so
+# these lowercase .NET folders are listed explicitly anyway.
+bin/
+obj/
+TestResults/
+*.trx
+coverage*/
 
 # --- Logs ---
 logs/
