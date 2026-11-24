@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Eudoria.Core.Api.Tests.Infrastructure;
 using Eudoria.Core.Identity.Accounts;
+using Eudoria.Core.Identity.Passwords;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
@@ -23,6 +24,18 @@ public sealed class ContractTests(PostgresFixture database)
     // A well-formed refresh token that was never issued.
     private const string UnknownRefreshToken = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
+    // Settings that make the next request of a route exceed its per-address limit.
+    private static readonly Dictionary<string, string> OneRegistration = new() { ["Identity:Throttling:Registration:PermitLimit"] = "1" };
+    private static readonly Dictionary<string, string> OneRefresh = new() { ["Identity:Throttling:Refresh:PermitLimit"] = "1" };
+    private static readonly Dictionary<string, string> OneAccountRequest = new() { ["Identity:Throttling:Account:PermitLimit"] = "1" };
+
+    // One hashing slot, a short wait: a request gets 503 while a scenario holds the slot.
+    private static readonly Dictionary<string, string> OneHashingSlot = new()
+    {
+        ["Identity:Throttling:MaxConcurrentHashes"] = "1",
+        ["Identity:Throttling:HashQueueTimeout"] = "00:00:00.100",
+    };
+
     /// <summary>One scenario per documented (method, path, status). Adding a response to the
     /// contract without a scenario here makes <see cref="EveryDocumentedResponse_HasAScenario"/> fail.</summary>
     private static readonly ContractScenario[] Scenarios =
@@ -34,12 +47,20 @@ public sealed class ContractTests(PostgresFixture database)
             Json(() => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), RegistrationTests.UniquePseudo(), "a-long-enough-passphrase"))),
         new("POST", "/accounts", HttpStatusCode.BadRequest, DatabaseReachable: true,
             Json(() => RegistrationTests.RegistrationJson("not-an-email", "x", "short"))),
-        new("POST", "/accounts", HttpStatusCode.Conflict, DatabaseReachable: true, async client =>
+        new("POST", "/accounts", HttpStatusCode.Conflict, DatabaseReachable: true, async (client, services) =>
         {
             (_, string takenPseudo) = await SessionTests.RegisterAsync(client);
             return new(RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), takenPseudo, "a-long-enough-passphrase"));
         }),
-        new("POST", "/auth/login", HttpStatusCode.OK, DatabaseReachable: true, async client =>
+        new("POST", "/accounts", HttpStatusCode.TooManyRequests, DatabaseReachable: true, async (client, services) =>
+        {
+            await SessionTests.RegisterAsync(client);
+            return new(RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), RegistrationTests.UniquePseudo(), "a-long-enough-passphrase"));
+        }, OneRegistration),
+        new("POST", "/accounts", HttpStatusCode.ServiceUnavailable, DatabaseReachable: true, async (_, services) => new(
+            RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), RegistrationTests.UniquePseudo(), "a-long-enough-passphrase"),
+            Held: await TakeEveryHashingSlotAsync(services)), OneHashingSlot),
+        new("POST", "/auth/login", HttpStatusCode.OK, DatabaseReachable: true, async (client, services) =>
         {
             (string email, _) = await SessionTests.RegisterAsync(client);
             return new(SessionTests.LoginJson(email, SessionTests.Password));
@@ -47,7 +68,20 @@ public sealed class ContractTests(PostgresFixture database)
         new("POST", "/auth/login", HttpStatusCode.BadRequest, DatabaseReachable: true, Json(() => "not json")),
         new("POST", "/auth/login", HttpStatusCode.Unauthorized, DatabaseReachable: true,
             Json(() => SessionTests.LoginJson(RegistrationTests.UniqueEmail(), SessionTests.Password))),
-        new("POST", "/auth/refresh", HttpStatusCode.OK, DatabaseReachable: true, async client =>
+        new("POST", "/auth/login", HttpStatusCode.TooManyRequests, DatabaseReachable: true, async (client, services) =>
+        {
+            string email = RegistrationTests.UniqueEmail();
+            for (int i = 0; i < 5; i++)
+            {
+                using HttpResponseMessage wrong = await SessionTests.LoginAsync(client, email, "not the right password");
+            }
+
+            return new(SessionTests.LoginJson(email, SessionTests.Password));
+        }),
+        new("POST", "/auth/login", HttpStatusCode.ServiceUnavailable, DatabaseReachable: true, async (_, services) => new(
+            SessionTests.LoginJson(RegistrationTests.UniqueEmail(), SessionTests.Password),
+            Held: await TakeEveryHashingSlotAsync(services)), OneHashingSlot),
+        new("POST", "/auth/refresh", HttpStatusCode.OK, DatabaseReachable: true, async (client, services) =>
         {
             (string email, _) = await SessionTests.RegisterAsync(client);
             JsonNode tokens = await SessionTests.LoginJsonAsync(client, email);
@@ -56,16 +90,43 @@ public sealed class ContractTests(PostgresFixture database)
         new("POST", "/auth/refresh", HttpStatusCode.BadRequest, DatabaseReachable: true, Json(() => "not json")),
         new("POST", "/auth/refresh", HttpStatusCode.Unauthorized, DatabaseReachable: true,
             Json(() => SessionTests.RefreshTokenJson(UnknownRefreshToken))),
+        new("POST", "/auth/refresh", HttpStatusCode.TooManyRequests, DatabaseReachable: true, async (client, services) =>
+        {
+            using HttpResponseMessage first = await SessionTests.RefreshAsync(client, UnknownRefreshToken);
+            return new(SessionTests.RefreshTokenJson(UnknownRefreshToken));
+        }, OneRefresh),
         new("POST", "/auth/logout", HttpStatusCode.NoContent, DatabaseReachable: true,
             Json(() => SessionTests.RefreshTokenJson(UnknownRefreshToken))),
         new("POST", "/auth/logout", HttpStatusCode.BadRequest, DatabaseReachable: true, Json(() => "not json")),
-        new("GET", "/me", HttpStatusCode.OK, DatabaseReachable: true, async client =>
-        {
-            (string email, _) = await SessionTests.RegisterAsync(client);
-            JsonNode tokens = await SessionTests.LoginJsonAsync(client, email);
-            return new(Body: null, BearerToken: tokens["accessToken"]!.GetValue<string>());
-        }),
+        new("GET", "/me", HttpStatusCode.OK, DatabaseReachable: true, async (client, services) =>
+            new(Body: null, BearerToken: await AccessTokenAsync(client))),
         new("GET", "/me", HttpStatusCode.Unauthorized, DatabaseReachable: true),
+        new("POST", "/me/password", HttpStatusCode.OK, DatabaseReachable: true, async (client, services) =>
+            new(AccountSecurityTests.ChangePasswordJson(SessionTests.Password, AccountSecurityTests.NewPassword), await AccessTokenAsync(client))),
+        new("POST", "/me/password", HttpStatusCode.BadRequest, DatabaseReachable: true, async (client, services) =>
+            new(AccountSecurityTests.ChangePasswordJson(SessionTests.Password, "azertyuiop123"), await AccessTokenAsync(client))),
+        new("POST", "/me/password", HttpStatusCode.Unauthorized, DatabaseReachable: true, async (client, services) =>
+            new(AccountSecurityTests.ChangePasswordJson("not the right password", AccountSecurityTests.NewPassword), await AccessTokenAsync(client))),
+        new("POST", "/me/password", HttpStatusCode.TooManyRequests, DatabaseReachable: true, async (client, services) =>
+        {
+            string accessToken = await AccessTokenAsync(client);
+            using HttpResponseMessage first = await AccountSecurityTests.ChangePasswordAsync(client, accessToken, "not the right password", AccountSecurityTests.NewPassword);
+            return new(AccountSecurityTests.ChangePasswordJson(SessionTests.Password, AccountSecurityTests.NewPassword), accessToken);
+        }, OneAccountRequest),
+        new("POST", "/me/password", HttpStatusCode.ServiceUnavailable, DatabaseReachable: true, async (client, services) =>
+        {
+            string accessToken = await AccessTokenAsync(client);
+            return new(AccountSecurityTests.ChangePasswordJson(SessionTests.Password, AccountSecurityTests.NewPassword), accessToken,
+                Held: await TakeEveryHashingSlotAsync(services));
+        }, OneHashingSlot),
+        new("POST", "/me/sessions/revoke-all", HttpStatusCode.NoContent, DatabaseReachable: true, async (client, services) =>
+            new(Body: null, BearerToken: await AccessTokenAsync(client))),
+        new("POST", "/me/sessions/revoke-all", HttpStatusCode.Unauthorized, DatabaseReachable: true),
+        new("POST", "/me/sessions/revoke-all", HttpStatusCode.TooManyRequests, DatabaseReachable: true, async (client, services) =>
+        {
+            using HttpResponseMessage first = await AccountSecurityTests.RevokeAllAsync(client, accessToken: null);
+            return new(Body: null, BearerToken: null);
+        }, OneAccountRequest),
     ];
 
     [Fact]
@@ -125,11 +186,13 @@ public sealed class ContractTests(PostgresFixture database)
                 .Single(operation => operation.Method == scenario.Method && operation.Path == scenario.Path)
                 .Responses[((int)scenario.Status).ToString(System.Globalization.CultureInfo.InvariantCulture)];
 
-            await using CoreApiFactory factory = new(scenario.DatabaseReachable ? database.ConnectionString : CoreApiFactory.UnreachableDatabase);
+            await using CoreApiFactory factory = new(
+                scenario.DatabaseReachable ? database.ConnectionString : CoreApiFactory.UnreachableDatabase, settings: scenario.Settings);
             using HttpClient client = factory.CreateClient();
-            ScenarioRequest request = scenario.Prepare is null ? new(Body: null) : await scenario.Prepare(client);
+            ScenarioRequest request = scenario.Prepare is null ? new(Body: null) : await scenario.Prepare(client, factory.Services);
 
             using HttpResponseMessage response = await SendAsync(client, scenario.Method, basePath + scenario.Path, request);
+            request.Held?.Dispose();
 
             Assert.Equal(scenario.Status, response.StatusCode);
             foreach ((string name, IOpenApiHeader header) in documented.Headers ?? new Dictionary<string, IOpenApiHeader>())
@@ -229,16 +292,30 @@ public sealed class ContractTests(PostgresFixture database)
         select (operation.Key.Method.ToUpperInvariant(), path.Key, operation.Value.Responses ?? []);
 
     /// <summary>A scenario whose request is only a JSON body, built when the scenario runs (unique values).</summary>
-    private static Func<HttpClient, Task<ScenarioRequest>> Json(Func<string> body) =>
-        _ => Task.FromResult(new ScenarioRequest(body()));
+    private static Func<HttpClient, IServiceProvider, Task<ScenarioRequest>> Json(Func<string> body) =>
+        (_, _) => Task.FromResult(new ScenarioRequest(body()));
+
+    /// <summary>Registers a new account, logs in, and returns its access token.</summary>
+    private static async Task<string> AccessTokenAsync(HttpClient client)
+    {
+        (string email, _) = await SessionTests.RegisterAsync(client);
+        return AccountSecurityTests.Access(await SessionTests.LoginJsonAsync(client, email));
+    }
+
+    /// <summary>Takes the only hashing slot (scenarios with <see cref="OneHashingSlot"/>) until disposed.</summary>
+    private static async Task<IDisposable> TakeEveryHashingSlotAsync(IServiceProvider services) =>
+        await services.GetRequiredService<PasswordHashingGate>().EnterAsync(TestContext.Current.CancellationToken);
 
     /// <param name="Prepare">Builds the request when the scenario runs; may first call the core
-    /// (register, log in...). Null: no body and no token.</param>
+    /// (register, log in...) or use its services. Null: no body and no token.</param>
+    /// <param name="Settings">Core settings for this scenario (e.g. low limits), or null.</param>
     private sealed record ContractScenario(
         string Method, string Path, HttpStatusCode Status, bool DatabaseReachable,
-        Func<HttpClient, Task<ScenarioRequest>>? Prepare = null);
+        Func<HttpClient, IServiceProvider, Task<ScenarioRequest>>? Prepare = null,
+        IReadOnlyDictionary<string, string>? Settings = null);
 
     /// <param name="Body">JSON request body, or null.</param>
     /// <param name="BearerToken">Access token sent in the Authorization header, or null.</param>
-    private sealed record ScenarioRequest(string? Body, string? BearerToken = null);
+    /// <param name="Held">Disposed once the response is received (e.g. a hashing slot kept busy).</param>
+    private sealed record ScenarioRequest(string? Body, string? BearerToken = null, IDisposable? Held = null);
 }

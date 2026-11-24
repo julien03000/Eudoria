@@ -1,3 +1,4 @@
+using Eudoria.Core.Identity.AccountSecurity;
 using Eudoria.Core.Identity.Passwords;
 using Eudoria.Core.Identity.Persistence;
 using Eudoria.Core.Identity.Profile;
@@ -58,6 +59,7 @@ public static class IdentityModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<RegistrationService>();
         services.AddScoped<SessionService>();
+        services.AddScoped<PasswordChangeService>();
 
         services.AddOptions<TokenOptions>()
             .BindConfiguration(TokenOptions.SectionName)
@@ -91,6 +93,10 @@ public static class IdentityModule
             .RequireRateLimiting(RateLimitPolicies.Refresh);
         api.MapPost("/auth/logout", SessionEndpoints.LogoutAsync);
         api.MapGet("/me", MeEndpoint.GetAsync).RequireAuthorization();
+        api.MapPost("/me/password", AccountSecurityEndpoints.ChangePasswordAsync)
+            .RequireAuthorization().RequireRateLimiting(RateLimitPolicies.Account).WithHashingBusyAnswer();
+        api.MapPost("/me/sessions/revoke-all", AccountSecurityEndpoints.RevokeAllSessionsAsync)
+            .RequireAuthorization().RequireRateLimiting(RateLimitPolicies.Account);
         return api;
     }
 
@@ -101,10 +107,12 @@ public static class IdentityModule
     /// <summary>
     /// Strict access-token validation: ES256 only, our key, our issuer, audience "eudoria-core",
     /// signed and expiring tokens required, 30 s clock tolerance; claims kept as issued ("sub").
+    /// Then tokens issued before a password change or "revoke all" are refused (<see cref="TokenRevocationCheck"/>).
     /// </summary>
     private static void ConfigureBearer(JwtBearerOptions bearer, TokenSigningKey signingKey, IOptions<TokenOptions> options)
     {
         bearer.MapInboundClaims = false;
+        bearer.Events = new JwtBearerEvents { OnTokenValidated = TokenRevocationCheck.OnTokenValidatedAsync };
         bearer.TokenValidationParameters = new TokenValidationParameters
         {
             ValidIssuer = options.Value.Issuer,
