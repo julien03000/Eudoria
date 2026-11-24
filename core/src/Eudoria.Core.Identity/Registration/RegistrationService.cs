@@ -1,4 +1,5 @@
 using Eudoria.Core.Identity.Accounts;
+using Eudoria.Core.Identity.Http;
 using Eudoria.Core.Identity.Passwords;
 using Eudoria.Core.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +8,6 @@ using Npgsql;
 using static Eudoria.Core.Identity.Accounts.AccountRules;
 
 namespace Eudoria.Core.Identity.Registration;
-
-/// <summary>One error of the contract's Problem.errors list.</summary>
-internal sealed record FieldError(string Field, string Code);
 
 internal enum RegistrationOutcome
 {
