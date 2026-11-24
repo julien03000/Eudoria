@@ -41,3 +41,12 @@ function Set-EudoriaConnectionString([hashtable]$envValues) {
         (ConvertTo-ConnectionStringValue $envValues['POSTGRES_USER']),
         (ConvertTo-ConnectionStringValue $envValues['POSTGRES_PASSWORD'])
 }
+
+# Sets the core's access-token signing key for this process only (in memory, never displayed).
+function Set-EudoriaTokenSigningKey([hashtable]$envValues) {
+    $key = $envValues['IDENTITY_TOKEN_SIGNING_KEY']
+    if (-not $key) {
+        throw "Missing IDENTITY_TOKEN_SIGNING_KEY in .env. Generate it once with: .\tools\dev\new-signing-key.ps1"
+    }
+    $env:Identity__Tokens__SigningKey = $key
+}
