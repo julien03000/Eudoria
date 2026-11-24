@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: EUDORIA Core — Public API
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Public API of the EUDORIA core (clients). Contract-first: this file is written
     before the code and the core is tested against it (ADR-0001).
@@ -14,6 +14,12 @@ tags:
     description: Liveness and readiness probes.
   - name: accounts
     description: EUDORIA identities (accounts).
+  - name: auth
+    description: |
+      Sessions: login, token renewal, logout. The access token is a JWT signed with ES256,
+      valid 15 minutes, audience "eudoria-core": it is accepted by the core API only (world
+      servers will get their own short-lived entry tickets, sub-step 1.6). The refresh token is
+      an opaque random value, stored server-side (hashed) and revocable; it is rotated on every use.
 paths:
   /health/live:
     get:
@@ -124,7 +130,172 @@ paths:
                 errors:
                   - field: pseudo
                     code: pseudo_taken
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Logs in with an e-mail and a password, and opens a session.
+      description: |
+        The e-mail is normalized as at registration (trimmed, lower-cased) and the password is
+        normalized to Unicode NFKC. An unknown e-mail and a wrong password get exactly the same
+        401 response (comparable duration), so this route does not reveal whether an e-mail has
+        an account. No limit on attempts yet (sub-step 1.4).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: ana@example.com
+              password: a-long-enough-passphrase
+      responses:
+        '200':
+          description: Logged in. A new session (refresh token family) is opened.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '400':
+          description: The request body is unreadable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                errors:
+                  - field: body
+                    code: body_invalid
+        '401':
+          description: Unknown e-mail or wrong password (indistinguishable on purpose).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                errors:
+                  - field: credentials
+                    code: invalid_credentials
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshSession
+      summary: Exchanges a refresh token for a new token pair (rotation).
+      description: |
+        The refresh token sent is consumed and can never be used again. Presenting an already
+        consumed refresh token is treated as theft: the whole session is revoked.
+        A refresh token is valid 7 days after it was issued, and a session at most 30 days after login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+            example:
+              refreshToken: 3q2-7wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      responses:
+        '200':
+          description: New token pair, in the same session.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '400':
+          description: The request body is unreadable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Unknown, expired, revoked or already used refresh token (indistinguishable).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                errors:
+                  - field: refreshToken
+                    code: refresh_token_invalid
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Closes the session of a refresh token.
+      description: |
+        Revokes the session (refresh token family) the token belongs to. Always answers 204,
+        even for an unknown or already revoked token. Access tokens already issued stay valid
+        until they expire (at most 15 minutes); clients simply forget them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+            example:
+              refreshToken: 3q2-7wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      responses:
+        '204':
+          description: Logged out (or nothing to do).
+        '400':
+          description: The request body is unreadable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /me:
+    get:
+      tags: [accounts]
+      operationId: getMyProfile
+      summary: Returns the profile of the account the access token belongs to.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's own profile (the e-mail is not returned).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+              example:
+                id: 0193f5a2-7c1e-7b3a-9d4e-2f6a8b0c1d2e
+                pseudo: Ana_42
+                createdAt: '2026-11-24T19:30:00+00:00'
+        '401':
+          description: |
+            Missing, expired, malformed or forged access token, or a token meant for another
+            audience. No body; the WWW-Authenticate header says "Bearer".
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from /auth/login or /auth/refresh (ES256, audience "eudoria-core").
+  headers:
+    NoStore:
+      description: Token responses must never be cached (RFC 6749).
+      schema:
+        type: string
+        enum: [no-store]
   schemas:
     RegisterAccountRequest:
       type: object
@@ -152,6 +323,58 @@ components:
         status:
           type: string
           enum: [accepted]
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    TokenPair:
+      type: object
+      additionalProperties: false
+      required: [accessToken, tokenType, expiresIn, refreshToken, refreshExpiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: JWT (ES256). Claims sub (account UUID), iss, aud ("eudoria-core"), iat, exp, jti.
+          pattern: '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Lifetime of the access token, in seconds.
+        refreshToken:
+          type: string
+          description: 32 random bytes, Base64 URL-safe without padding.
+          pattern: '^[A-Za-z0-9_-]{43}$'
+        refreshExpiresIn:
+          type: integer
+          description: Lifetime of this refresh token, in seconds (never beyond the end of the session).
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [id, pseudo, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Stable internal identifier of the account (same value as the token's "sub").
+        pseudo:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
     Problem:
       type: object
       description: RFC 9457 problem details, with one machine-readable code per error.
@@ -175,7 +398,7 @@ components:
       properties:
         field:
           type: string
-          enum: [body, email, pseudo, password]
+          enum: [body, email, pseudo, password, credentials, refreshToken]
           description: "'body' when the request as a whole is unreadable (not JSON, unknown or duplicate property, wrong type, too large)."
         code:
           type: string
@@ -192,6 +415,8 @@ components:
             - password_required
             - password_too_short
             - password_too_long
+            - invalid_credentials
+            - refresh_token_invalid
     HealthStatus:
       type: object
       additionalProperties: false
