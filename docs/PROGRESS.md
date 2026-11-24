@@ -30,8 +30,10 @@
 - **`main` envoyé sur GitHub** (`https://github.com/julien03000/Eudoria`, suivi de `origin/main`). Authentification par Git Credential Manager, faite par le porteur dans le navigateur ; aucun jeton dans un fichier.
 - **Verrouillage LFS testé avec succès sur GitHub** : fichier `.uasset` en lecture seule tant qu'il n'est pas verrouillé, `git lfs lock` / `locks` / `locks --verify` / `unlock` fonctionnels. Fichier de test supprimé ensuite (il reste dans l'historique, 2 Ko en LFS).
 
+- PC redémarré ; licence Docker acceptée par le porteur. **Docker testé** : client et serveur 29.9.3, `docker run --rm hello-world` réussi ; distribution `docker-desktop` en WSL 2 ; données dans `E:\Dev\Docker\Data` (1,5 Go). C: : 68,8 Go libres après redémarrage.
+
 ## 🟡 En cours
-- Redémarrage du PC demandé par Visual Studio, puis premier lancement de Docker Desktop (acceptation de la licence par le porteur) et test `docker run hello-world`.
+- **Phase 0 terminée de mon côté, en attente de ta validation** : tous ses critères (ROADMAP) sont remplis.
 
 ## 🧹 Traces de l'ancienne installation d'Unreal (décisions du porteur, 2026-11-24)
 
@@ -50,13 +52,13 @@
 - Quota LFS gratuit de GitHub : 10 Gio de stockage et 10 Gio de téléchargement par mois — à surveiller dès l'arrivée des premiers assets.
 - **.NET** : Visual Studio 18.12 a installé le SDK **11** (et non 10). Le runtime .NET 10 LTS est présent et le SDK 11 compile pour net10.0 : conforme à l'ADR-0001. Au début de l'étape 1, décider s'il faut épingler un SDK 10 (`global.json`) ou utiliser le SDK 11.
 - **Mémoire vive : 16 Go** (32 recommandés). Passage à 32 Go prévu avant l'étape 3. En attendant : limiter `MaxParallelActions` d'Unreal Build Tool (voir `CLAUDE.md`), et vérifier que la limite s'applique bien à l'UBA.
-- **Disque C:** ~48 Go libres après Visual Studio et Docker ; il descend temporairement pendant les installations.
+- **Disque C:** ~69 Go libres après redémarrage ; il descend temporairement pendant les installations.
 - `LauncherInstalled.dat` ne liste pas encore UE 5.8 : vérifier que le moteur apparaît dans la Bibliothèque du lanceur.
 - La limite mémoire WSL (4 Go) s'applique aussi à la distribution Ubuntu déjà présente sur le PC.
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Redémarrer le PC ; lancer Docker Desktop (licence), tester `docker run hello-world`.
-2. Clôturer la Phase 0, créer la branche `etape-01-identite` et proposer le plan de la sous-étape 1.1
+1. Le porteur valide la Phase 0 (passage à 🟢 dans la ROADMAP).
+2. Créer la branche `etape-01-identite` et proposer le plan de la sous-étape 1.1
    (squelette du noyau + environnement local + route « santé »).
 3. Au début de l'étape 1 : rediriger le DDC/Zen d'Unreal vers E:, **puis** supprimer les anciens caches DDC et Zen ; créer `BuildConfiguration.xml` avec la limite de compilations parallèles.
