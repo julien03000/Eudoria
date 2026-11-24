@@ -1,3 +1,6 @@
+using Eudoria.Core.Identity;
+using Eudoria.Core.Identity.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 
 namespace Eudoria.Core.Api.Tests.Infrastructure;
@@ -27,7 +30,17 @@ public sealed class PostgresFixture : IAsyncLifetime
             throw new InvalidOperationException(
                 "Could not start the test PostgreSQL container. Is Docker Desktop running?", exception);
         }
+
+        // Same migrations as tools/dev/migrate.ps1, applied once for the whole collection.
+        await using IdentityDbContext identity = CreateIdentityDbContext();
+        await identity.Database.MigrateAsync();
     }
+
+    /// <summary>A context on the test database, to inspect what the core wrote.</summary>
+    internal IdentityDbContext CreateIdentityDbContext() =>
+        new(new DbContextOptionsBuilder<IdentityDbContext>()
+            .UseNpgsql(ConnectionString, IdentityModule.ConfigureNpgsql)
+            .Options);
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();
 }

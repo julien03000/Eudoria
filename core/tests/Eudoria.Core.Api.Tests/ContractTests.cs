@@ -1,6 +1,8 @@
 using System.Net;
+using System.Text;
 using System.Text.Json.Nodes;
 using Eudoria.Core.Api.Tests.Infrastructure;
+using Eudoria.Core.Identity.Accounts;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
@@ -17,6 +19,9 @@ public sealed class ContractTests(PostgresFixture database)
 {
     private static readonly string ContractPath = Path.Combine(AppContext.BaseDirectory, "Contracts", "core-v1.yaml");
 
+    // A pseudo registered before the "409" scenario (Setup), so that the scenario finds it taken.
+    private static readonly string TakenPseudo = RegistrationTests.UniquePseudo();
+
     /// <summary>One scenario per documented (method, path, status). Adding a response to the
     /// contract without a scenario here makes <see cref="EveryDocumentedResponse_HasAScenario"/> fail.</summary>
     private static readonly ContractScenario[] Scenarios =
@@ -24,6 +29,13 @@ public sealed class ContractTests(PostgresFixture database)
         new("GET", "/health/live", HttpStatusCode.OK, DatabaseReachable: true),
         new("GET", "/health/ready", HttpStatusCode.OK, DatabaseReachable: true),
         new("GET", "/health/ready", HttpStatusCode.ServiceUnavailable, DatabaseReachable: false),
+        new("POST", "/accounts", HttpStatusCode.Accepted, DatabaseReachable: true,
+            Body: () => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), RegistrationTests.UniquePseudo(), "a-long-enough-passphrase")),
+        new("POST", "/accounts", HttpStatusCode.BadRequest, DatabaseReachable: true,
+            Body: () => RegistrationTests.RegistrationJson("not-an-email", "x", "short")),
+        new("POST", "/accounts", HttpStatusCode.Conflict, DatabaseReachable: true,
+            Body: () => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), TakenPseudo, "a-long-enough-passphrase"),
+            Setup: () => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), TakenPseudo, "a-long-enough-passphrase")),
     ];
 
     [Fact]
@@ -82,19 +94,69 @@ public sealed class ContractTests(PostgresFixture database)
             IOpenApiResponse documented = EnumerateOperations(contract)
                 .Single(operation => operation.Method == scenario.Method && operation.Path == scenario.Path)
                 .Responses[((int)scenario.Status).ToString(System.Globalization.CultureInfo.InvariantCulture)];
-            IOpenApiSchema schema = documented.Content!["application/json"].Schema!;
+            (string mediaType, IOpenApiMediaType content) = Assert.Single(documented.Content!);
+            IOpenApiSchema schema = content.Schema!;
 
             await using CoreApiFactory factory = new(scenario.DatabaseReachable ? database.ConnectionString : CoreApiFactory.UnreachableDatabase);
             using HttpClient client = factory.CreateClient();
-            using HttpRequestMessage request = new(new HttpMethod(scenario.Method), new Uri(basePath + scenario.Path, UriKind.Relative));
-            using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+            if (scenario.Setup is not null)
+            {
+                using HttpResponseMessage setup = await SendAsync(client, scenario.Method, basePath + scenario.Path, scenario.Setup());
+                Assert.True(setup.IsSuccessStatusCode, $"{scenario}: setup failed with {setup.StatusCode}.");
+            }
+
+            using HttpResponseMessage response = await SendAsync(client, scenario.Method, basePath + scenario.Path, scenario.Body?.Invoke());
 
             Assert.Equal(scenario.Status, response.StatusCode);
-            Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(mediaType, response.Content.Headers.ContentType?.MediaType);
             JsonNode? body = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
             IReadOnlyList<string> errors = SchemaValidator.Validate(body, schema);
             Assert.True(errors.Count == 0, $"{scenario}: {string.Join("; ", errors)}");
         }
+    }
+
+    [Fact]
+    public async Task RequestExamples_MatchTheirSchemas()
+    {
+        OpenApiDocument contract = await LoadDocumentAsync();
+
+        foreach (OpenApiOperation operation in contract.Paths.Values.SelectMany(path => path.Operations?.Values.AsEnumerable() ?? []))
+        {
+            foreach ((string mediaType, IOpenApiMediaType content) in operation.RequestBody?.Content ?? new Dictionary<string, IOpenApiMediaType>())
+            {
+                Assert.NotNull(content.Example);
+                IReadOnlyList<string> errors = SchemaValidator.Validate(content.Example, content.Schema!);
+                Assert.True(errors.Count == 0, $"{operation.OperationId} {mediaType}: {string.Join("; ", errors)}");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task RegistrationLimits_InTheContract_MatchTheCode()
+    {
+        OpenApiDocument contract = await LoadDocumentAsync();
+        IDictionary<string, IOpenApiSchema> fields = contract.Components!.Schemas!["RegisterAccountRequest"].Properties!;
+
+        Assert.Equal(AccountRules.EmailMaxLength, fields["email"].MaxLength);
+        Assert.Equal(AccountRules.PseudoMinLength, fields["pseudo"].MinLength);
+        Assert.Equal(AccountRules.PseudoMaxLength, fields["pseudo"].MaxLength);
+        Assert.Equal(AccountRules.PasswordMinLength, fields["password"].MinLength);
+        Assert.Equal(AccountRules.PasswordMaxLength, fields["password"].MaxLength);
+
+        IEnumerable<string> documentedCodes = contract.Components.Schemas["FieldError"].Properties!["code"].Enum!.Select(code => code!.GetValue<string>());
+        IEnumerable<string> codeConstants = typeof(AccountRules.ErrorCodes).GetFields().Select(field => (string)field.GetRawConstantValue()!);
+        Assert.Equal(documentedCodes.Order(StringComparer.Ordinal), codeConstants.Order(StringComparer.Ordinal));
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string method, string path, string? jsonBody)
+    {
+        using HttpRequestMessage request = new(new HttpMethod(method), new Uri(path, UriKind.Relative));
+        if (jsonBody is not null)
+        {
+            request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+        }
+
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private static async Task<ReadResult> LoadContractAsync()
@@ -120,5 +182,9 @@ public sealed class ContractTests(PostgresFixture database)
         from operation in path.Value.Operations ?? []
         select (operation.Key.Method.ToUpperInvariant(), path.Key, operation.Value.Responses ?? []);
 
-    private sealed record ContractScenario(string Method, string Path, HttpStatusCode Status, bool DatabaseReachable);
+    /// <param name="Body">JSON request body, built when the scenario runs (unique values).</param>
+    /// <param name="Setup">Optional JSON body sent once to the same route before the scenario.</param>
+    private sealed record ContractScenario(
+        string Method, string Path, HttpStatusCode Status, bool DatabaseReachable,
+        Func<string>? Body = null, Func<string>? Setup = null);
 }
