@@ -21,6 +21,7 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.Property(account => account.PseudoNormalized).HasColumnName("pseudo_normalized").HasMaxLength(AccountRules.PseudoMaxLength);
         builder.Property(account => account.PasswordHash).HasColumnName("password_hash");
         builder.Property(account => account.CreatedAt).HasColumnName("created_at");
+        builder.Property(account => account.TokensValidAfter).HasColumnName("tokens_valid_after");
 
         // Uniqueness is guaranteed by the database, even for simultaneous registrations.
         builder.HasIndex(account => account.Email).IsUnique().HasDatabaseName(EmailIndex);

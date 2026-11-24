@@ -19,4 +19,10 @@ internal sealed class Account
     public required string PasswordHash { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>
+    /// Access tokens issued (claim "iat") before this date are refused, and tokens are never issued
+    /// before it. Set by a password change or "revoke all sessions"; null until then.
+    /// </summary>
+    public DateTimeOffset? TokensValidAfter { get; init; }
 }

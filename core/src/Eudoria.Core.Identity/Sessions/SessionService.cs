@@ -76,31 +76,43 @@ internal sealed partial class SessionService(
             return LoginResult.InvalidCredentials;
         }
 
-        using PasswordHashingGate.Slot slot = await hashingGate.EnterAsync(cancellationToken);
-
         var account = await database.Accounts.AsNoTracking()
             .Where(candidate => candidate.Email == normalizedEmail)
             .Select(candidate => new { candidate.Id, candidate.PasswordHash })
             .SingleOrDefaultAsync(cancellationToken);
 
-        // Hashed in every case, so an unknown e-mail takes as long as a wrong password.
-        bool verified = passwordHasher.Verify(normalizedPassword, account?.PasswordHash ?? dummyHash.Value);
-        if (account is null || !verified)
+        string currentHash;
+        using (await hashingGate.EnterAsync(cancellationToken))
         {
-            attempt.Failed();
+            // Hashed in every case, so an unknown e-mail takes as long as a wrong password.
+            bool verified = passwordHasher.Verify(normalizedPassword, account?.PasswordHash ?? dummyHash.Value);
+            if (account is null || !verified)
+            {
+                attempt.Failed();
+                LogLoginFailed(logger);
+                return LoginResult.InvalidCredentials;
+            }
+
+            attempt.Succeeded();
+            currentHash = passwordHasher.NeedsRehash(account.PasswordHash)
+                ? await RehashAsync(account.Id, account.PasswordHash, normalizedPassword, cancellationToken)
+                : account.PasswordHash;
+        }
+
+        // The password may have been changed since it was checked: open the session only if the
+        // account still has the hash that was verified (row locked against a simultaneous change).
+        DateTimeOffset now = time.GetUtcNow();
+        await using IDbContextTransaction transaction = await database.Database.BeginTransactionAsync(cancellationToken);
+        AccountLock? locked = await LockAccountAsync(account.Id, cancellationToken);
+        if (locked is null || locked.PasswordHash != currentHash)
+        {
+            await transaction.RollbackAsync(cancellationToken);
             LogLoginFailed(logger);
             return LoginResult.InvalidCredentials;
         }
 
-        attempt.Succeeded();
-
-        if (passwordHasher.NeedsRehash(account.PasswordHash))
-        {
-            await RehashAsync(account.Id, account.PasswordHash, normalizedPassword, cancellationToken);
-        }
-
-        DateTimeOffset now = time.GetUtcNow();
-        TokenPair pair = await IssueAsync(account.Id, familyId: Guid.CreateVersion7(now), now + options.Value.SessionLifetime, now, cancellationToken);
+        TokenPair pair = await OpenSessionAsync(account.Id, IssuedAt(now, locked), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         LogLoggedIn(logger, account.Id);
         return new LoginResult(pair, null);
     }
@@ -135,7 +147,17 @@ internal sealed partial class SessionService(
 
         // Consuming the old token and storing the new one is atomic. A simultaneous renewal with the
         // same token waits on the row lock, then finds it consumed: it is a reuse (strict version).
+        // The account row is locked first: a simultaneous "revoke all" (which updates that row) either
+        // waits for this renewal and then revokes the new token too, or runs first and this renewal
+        // finds its token revoked.
         await using IDbContextTransaction transaction = await database.Database.BeginTransactionAsync(cancellationToken);
+        AccountLock? locked = await LockAccountAsync(token.AccountId, cancellationToken);
+        if (locked is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
         int consumed = await database.RefreshTokens
             .Where(candidate => candidate.Id == token.Id && candidate.RevokedAt == null)
             .ExecuteUpdateAsync(setters => setters.SetProperty(candidate => candidate.RevokedAt, now), cancellationToken);
@@ -146,9 +168,81 @@ internal sealed partial class SessionService(
             return null;
         }
 
-        TokenPair pair = await IssueAsync(token.AccountId, token.FamilyId, token.SessionExpiresAt, now, cancellationToken);
+        TokenPair pair = await IssueAsync(token.AccountId, token.FamilyId, token.SessionExpiresAt, IssuedAt(now, locked), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return pair;
+    }
+
+    /// <summary>
+    /// "Sign out every device": revokes every session of the account and refuses every access token
+    /// issued so far. Returns false when the account does not exist.
+    /// </summary>
+    public async Task<bool> RevokeAllAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        DateTimeOffset now = time.GetUtcNow();
+        await using IDbContextTransaction transaction = await database.Database.BeginTransactionAsync(cancellationToken);
+        int updated = await MoveTokensValidAfterAsync(accountId, CeilingToSecond(now), cancellationToken);
+        if (updated == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        int revoked = await RevokeAccountSessionsAsync(accountId, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        LogAllSessionsRevoked(logger, accountId, revoked);
+        return true;
+    }
+
+    /// <summary>
+    /// Opens a new session (refresh token family) whose tokens are issued at <paramref name="issuedAt"/>.
+    /// Call it inside a transaction that holds the account row (<see cref="LockAccountAsync"/>, or an update).
+    /// </summary>
+    internal Task<TokenPair> OpenSessionAsync(Guid accountId, DateTimeOffset issuedAt, CancellationToken cancellationToken) =>
+        IssueAsync(accountId, familyId: Guid.CreateVersion7(issuedAt), issuedAt + options.Value.SessionLifetime, issuedAt, cancellationToken);
+
+    /// <summary>
+    /// Moves the account's "tokens valid after" date forward (never backward); the update locks the
+    /// account row until the end of the transaction. Returns the number of rows updated (0: no account).
+    /// </summary>
+    internal Task<int> MoveTokensValidAfterAsync(Guid accountId, DateTimeOffset validAfter, CancellationToken cancellationToken) =>
+        database.Accounts
+            .Where(account => account.Id == accountId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                account => account.TokensValidAfter,
+                account => account.TokensValidAfter == null || account.TokensValidAfter < validAfter ? validAfter : account.TokensValidAfter),
+                cancellationToken);
+
+    /// <summary>Revokes every still-valid refresh token of the account. Returns how many.</summary>
+    internal Task<int> RevokeAccountSessionsAsync(Guid accountId, DateTimeOffset now, CancellationToken cancellationToken) =>
+        database.RefreshTokens
+            .Where(candidate => candidate.AccountId == accountId && candidate.RevokedAt == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(candidate => candidate.RevokedAt, now), cancellationToken);
+
+    /// <summary>
+    /// Access tokens carry "iat" in whole seconds: "valid after" dates are rounded up to the next
+    /// second, so a token issued in the same second as a revocation is refused too.
+    /// </summary>
+    internal static DateTimeOffset CeilingToSecond(DateTimeOffset value)
+    {
+        long remainder = value.UtcTicks % TimeSpan.TicksPerSecond;
+        return remainder == 0 ? value : value.AddTicks(TimeSpan.TicksPerSecond - remainder);
+    }
+
+    /// <summary>Tokens are never issued before the account's "valid after" date (else they would be refused at once).</summary>
+    private static DateTimeOffset IssuedAt(DateTimeOffset now, AccountLock locked) =>
+        locked.TokensValidAfter is { } validAfter && validAfter > now ? validAfter : now;
+
+    /// <summary>Reads the account row and locks it (FOR SHARE) until the end of the current transaction.</summary>
+    private async Task<AccountLock?> LockAccountAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        List<AccountLock> rows = await database.Database.SqlQuery<AccountLock>($"""
+            SELECT password_hash AS "PasswordHash", tokens_valid_after AS "TokensValidAfter"
+            FROM identity.accounts
+            WHERE id = {accountId}
+            FOR SHARE
+            """).ToListAsync(cancellationToken);
+        return rows.SingleOrDefault();
     }
 
     /// <summary>Revokes the session of a refresh token. Does nothing (silently) for an unknown token.</summary>
@@ -218,8 +312,9 @@ internal sealed partial class SessionService(
     /// <summary>
     /// Replaces a hash made with an older cost. A failure does not prevent the login: the old hash
     /// stays valid and the next login tries again. Only replaced if unchanged meanwhile.
+    /// Returns the hash the account should now have (the new one, or the old one if not replaced).
     /// </summary>
-    private async Task RehashAsync(Guid accountId, string oldHash, string password, CancellationToken cancellationToken)
+    private async Task<string> RehashAsync(Guid accountId, string oldHash, string password, CancellationToken cancellationToken)
     {
         try
         {
@@ -230,12 +325,15 @@ internal sealed partial class SessionService(
             if (updated > 0)
             {
                 LogRehashed(logger, accountId);
+                return newHash;
             }
         }
         catch (Exception exception) when (exception is DbUpdateException or InvalidOperationException or Npgsql.NpgsqlException)
         {
             LogRehashFailed(logger, accountId, exception);
         }
+
+        return oldHash;
     }
 
     private static DateTimeOffset Min(DateTimeOffset left, DateTimeOffset right) => left < right ? left : right;
@@ -264,4 +362,15 @@ internal sealed partial class SessionService(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Account {AccountId} logged out.")]
     private static partial void LogLoggedOut(ILogger logger, Guid accountId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Every session of account {AccountId} revoked ({RevokedCount} active token(s)); earlier access tokens refused.")]
+    private static partial void LogAllSessionsRevoked(ILogger logger, Guid accountId, int revokedCount);
+}
+
+/// <summary>The account row as read under lock: its password hash and its "tokens valid after" date.</summary>
+internal sealed class AccountLock
+{
+    public required string PasswordHash { get; init; }
+
+    public DateTimeOffset? TokensValidAfter { get; init; }
 }

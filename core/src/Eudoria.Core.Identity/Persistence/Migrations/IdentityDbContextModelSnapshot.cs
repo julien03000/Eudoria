@@ -56,6 +56,10 @@ namespace Eudoria.Core.Identity.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("pseudo_normalized");
 
+                    b.Property<DateTimeOffset?>("TokensValidAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tokens_valid_after");
+
                     b.HasKey("Id")
                         .HasName("pk_accounts");
 
