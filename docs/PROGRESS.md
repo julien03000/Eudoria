@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-24 (sous-étape 1.3 validée)
+**Dernière mise à jour :** 2026-11-24 (sous-étape 1.4 réalisée, en attente de validation)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -48,6 +48,22 @@
     en 5.8, reçoit `MaxParallelActions` et lit `MemoryPerActionBytes` → **inutile de désactiver l'UBA**.
     Confirmation pratique (nombre de tâches parallèles dans le journal d'UBT) à la première compilation (1.5).
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
+- **Plan de la sous-étape 1.4 validé** le 2026-11-24 (8 recommandations + compléments du porteur : IPv6 compté par
+  préfixe /64 ; liste de mots de passe SecLists **1 million + liste française**, choix du porteur).
+- **Sous-étape 1.4 réalisée le 2026-11-24 — 🟡 en attente de ta validation** (`docs/plans/etape-01-4.md`, § 15) :
+  - contrat core-v1 **1.3.0** : `POST /v1/me/password`, `POST /v1/me/sessions/revoke-all`, réponses 429 (`Retry-After`)
+    et 503 `server_busy`, codes `password_too_common`, `password_unchanged`, `too_many_attempts` ;
+  - **limitation des tentatives** : échecs comptés par e-mail + adresse (5 gratuits, puis 1 → 15 min) et par e-mail seul
+    (20 en 15 min), e-mail connu ou non, mot de passe **non vérifié** pendant un blocage ; débit par adresse (IPv4, ou
+    **IPv6 /64**) sur connexion, inscription, renouvellement et routes du compte ; au plus 4 hachages simultanés ;
+  - **mots de passe courants** refusés (29 961 entrées, 417 Kio, script `tools/dev/build-password-blocklist.ps1`) + mots du
+    contexte (pseudo, début de l'e-mail, « eudoria ») ;
+  - **changement de mot de passe** et **« tout déconnecter »** : toutes les sessions révoquées et **jetons d'accès coupés
+    aussitôt** (colonne `tokens_valid_after`, migration `AddTokensValidAfter`) ; course avec un renouvellement corrigée ;
+  - **inscription égalisée** : mêmes requêtes SQL pour « e-mail utilisé » et « inscription réussie » (`INSERT … ON CONFLICT`),
+    **plus d'erreur EF Core** dans les journaux ;
+  - **229 tests passent**, 7 tests de mutation détectés, build 0 avertissement, format propre ; lancement réel vérifié
+    (journal sans `fail:`) ; **mesures de durée non concluantes** (poste chargé pendant la mesure, à refaire).
 - **Plan de la sous-étape 1.3 validé** le 2026-11-24 (7 recommandations + compléments du porteur : audience `eudoria-core`,
   `MapInboundClaims = false`, `RequireSignedTokens` / `RequireExpirationTime` explicites, version stricte de la rotation).
 - **Sous-étape 1.3 réalisée et ✅ validée par le porteur le 2026-11-24** (`docs/plans/etape-01-3.md`, § 14) :
@@ -101,16 +117,25 @@
 | Réglages éditeur 5.8 | `%LOCALAPPDATA%\UnrealEngine\5.8` | 0,12 Go | À garder (installation actuelle) |
 
 ## ⚠️ Problèmes connus / points d'attention
-- **Reporté en 1.4 (décision du porteur)**, inscrit dans le découpage de la ROADMAP : écart de durée de ~5 ms pour un
-  e-mail déjà utilisé, et erreur EF Core (`fail:`, sans donnée sensible) dans les journaux dans ce même cas.
+- **Mesures de durée de la 1.4 à refaire sur un poste au repos** (inscription « nouvel e-mail » / « e-mail utilisé »,
+  connexion « e-mail inconnu » / « mauvais mot de passe ») : pendant la mesure, un jeu tournait (0,6 Go de RAM libre),
+  bruit de ±15 ms. L'égalité des requêtes est prouvée par un test ; seule la mesure chiffrée manque.
+- **Dette (1.4)** : compteurs d'échecs **en mémoire** (remis à zéro au redémarrage du noyau, non partagés entre plusieurs
+  instances) → stockage partagé à prévoir avec l'hébergement (étape 6). Un attaquant qui connaît un e-mail peut le
+  bloquer 15 min (20 échecs) : à revoir avec la double authentification.
+- **Dette (1.4)** : derrière un proxy (hébergement), configurer les en-têtes transmis (`ForwardedHeaders`, proxys de
+  confiance), sinon tous les clients auraient la même adresse. Vérification en ligne « Have I Been Pwned » : avant
+  toute ouverture publique.
+- Listes de mots de passe téléchargées : `E:\Dev\_downloads\seclists` (8,9 Mo, jamais commitées, supprimables ; il
+  faut les retélécharger pour reconstruire la liste).
 - **Dette (décision du porteur, 2026-11-24, plan 1.3)** : renouvellement strict — si la réponse d'un renouvellement est
   perdue (réseau instable) et que le client réessaie, la session est coupée. Prévoir un éventuel **délai de grâce**
   quand les clients mobile et VR arriveront.
 - Comptes créés en 1.2 avec l'ancien coût Argon2id (19 Mio / 2 passes) : **ré-hachés automatiquement à leur prochaine
   connexion** (mécanisme livré en 1.3) ; 6 comptes locaux concernés.
-- **Pas encore de limitation des tentatives de connexion** (prévue en 1.4) : le noyau ne doit tourner qu'en local d'ici là.
 - **Dette (1.3)** : les jetons de renouvellement expirés ne sont jamais supprimés de la table (nettoyage à prévoir) ;
-  une déconnexion simultanée à un renouvellement de la même session peut laisser vivre le nouveau jeton (cas théorique).
+  une déconnexion simultanée à un renouvellement de la même session peut laisser vivre le nouveau jeton (cas théorique ;
+  le même cas avec « tout déconnecter » est corrigé en 1.4).
 - `new-signing-key.ps1` laisse ~9 Mo de compilation dans `%TEMP%\dotnet\runfile` (C:, supprimable).
 - **Sauvegarde** : le dépôt est sur GitHub ; la seconde sauvegarde indépendante recommandée par l'ADR-0006 (disque externe) n'est pas encore en place.
 - Quota LFS gratuit de GitHub : 10 Gio de stockage et 10 Gio de téléchargement par mois — à surveiller dès l'arrivée des premiers assets.
@@ -123,6 +148,8 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Sur demande du porteur seulement : proposer le plan de la **sous-étape 1.4** (limitation des tentatives de connexion,
-   validations, changement de mot de passe + « déconnecter tous mes appareils », reports de la 1.2 listés dans la ROADMAP),
-   l'écrire dans `docs/plans/etape-01-4.md` et attendre le « OK ». **Ne pas commencer la 1.4 sans son accord.**
+1. **Le porteur valide la sous-étape 1.4** (compte rendu : `docs/plans/etape-01-4.md`, § 15). Si possible, refaire avant
+   les mesures de durée sur un poste au repos (je peux les relancer sur demande).
+2. Ensuite, sur demande du porteur seulement : proposer le plan de la **sous-étape 1.5** (création du projet Unreal en C++,
+   plugin socle `EudoriaCore`, Git LFS, client minimal : écrans « Créer un compte », « Se connecter », « Bienvenue »),
+   l'écrire dans `docs/plans/etape-01-5.md` et attendre le « OK ». **Ne pas commencer la 1.5 sans son accord.**

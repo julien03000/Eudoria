@@ -165,7 +165,7 @@ Le détail interne de chaque dossier sera défini à l'étape qui le crée.
 - Hébergement des serveurs (Linux), déploiement, observabilité → avant toute mise en ligne publique.
 - Mécanisme de distribution du contenu des mondes (paquets par monde) → étape 6.
 
-## 8. Le noyau aujourd'hui (étape 1.3)
+## 8. Le noyau aujourd'hui (étape 1.4)
 
 ```
 global.json                      # SDK .NET 11 épinglé ; lanceur de tests Microsoft.Testing.Platform
@@ -177,6 +177,7 @@ tools/dev/
 ├── docker-compose.yml           # PostgreSQL 18.7, publié sur 127.0.0.1 uniquement
 ├── DotEnv.ps1                   # lecture de .env + chaîne de connexion et clé de signature en mémoire (partagés)
 ├── new-signing-key.ps1          # génère la clé ES256 des jetons d'accès dans .env (jamais affichée)
+├── build-password-blocklist.ps1 # fabrique la liste des mots de passe courants à partir de listes publiques (SecLists)
 ├── NewSigningKey.cs             # petit programme C# « fichier unique » appelé par le script ci-dessus
 ├── start-db.ps1                 # démarre / arrête la base (-Stop)
 ├── migrate.ps1                  # applique les migrations de chaque module (geste volontaire, jamais au démarrage)
@@ -186,29 +187,36 @@ core/
 ├── Directory.Build.props        # net10.0, avertissements = erreurs, analyse figée sur .NET 10
 ├── Directory.Packages.props     # TOUTES les versions de paquets, au même endroit
 ├── src/Eudoria.Core.Api/        # hôte ASP.NET Core (Minimal APIs)
-│   ├── Program.cs               # démarrage ; assemble les modules ; authentification ; routes publiques sous /v1
-│   ├── appsettings.json         # réglages non secrets (durées des jetons, émetteur, audience)
+│   ├── Program.cs               # démarrage ; assemble les modules ; limiteur de débit ; authentification ; routes /v1
+│   ├── appsettings.json         # réglages non secrets (durées des jetons, émetteur, audience, limites)
 │   ├── Database/                # options + source de données PostgreSQL (Npgsql), partagée par les modules
 │   └── Health/                  # /v1/health/live et /v1/health/ready
 ├── src/Eudoria.Core.Identity/   # module Identité (comptes, sessions, jetons) — seule partie publique : IdentityModule
 │   ├── IdentityModule.cs        # AddIdentityModule() / MapIdentityEndpoints() ; vérification stricte des jetons Bearer
 │   ├── Accounts/                # entité Account ; règles et normalisation (e-mail, pseudo, mot de passe NFKC) ; codes d'erreur
-│   ├── Passwords/               # IPasswordHasher ; Argon2id via NSec (libsodium), format PHC ; détection « à ré-hacher »
-│   ├── Http/                    # lecture stricte des corps JSON ; réponses d'erreur Problem Details
+│   ├── Passwords/               # IPasswordHasher ; Argon2id via NSec (libsodium), format PHC ; détection « à ré-hacher » ;
+│   │                            # liste des mots de passe courants (ressource embarquée) ; limite de hachages simultanés
+│   ├── Throttling/              # compteurs d'échecs (LoginThrottle), clé client (IPv4 / IPv6 /64), politiques de débit
+│   ├── Http/                    # lecture stricte des corps JSON ; réponses d'erreur Problem Details (400, 401, 409, 429, 503)
 │   ├── Registration/            # POST /v1/accounts : service d'inscription
-│   ├── Tokens/                  # options, clé de signature ES256, émission des JWT, jeton de renouvellement (entité + valeur)
-│   ├── Sessions/                # POST /v1/auth/login, /refresh, /logout : connexion, rotation, révocation
+│   ├── Tokens/                  # options, clé ES256, émission des JWT, jeton de renouvellement ; refus des jetons révoqués
+│   ├── Sessions/                # POST /v1/auth/login, /refresh, /logout : connexion, rotation, révocation, « tout déconnecter »
 │   ├── Profile/                 # GET /v1/me (route protégée)
+│   ├── AccountSecurity/         # POST /v1/me/password, POST /v1/me/sessions/revoke-all (routes protégées)
 │   └── Persistence/             # EF Core : IdentityDbContext (schéma « identity »), configurations, Migrations/
 └── tests/
-    ├── Eudoria.Core.Identity.Tests/  # unitaires : règles, NFKC, Argon2id (coût réel mesuré, ré-hachage), clé, JWT, jeton de renouvellement
+    ├── Eudoria.Core.Identity.Tests/  # unitaires : règles, NFKC, Argon2id, clé, JWT, jeton de renouvellement, liste de mots
+    │                                 # de passe courants, compteurs d'échecs (horloge manuelle), clé client IPv6 /64
     └── Eudoria.Core.Api.Tests/
         ├── HealthEndpointsTests.cs   # comportement des routes santé
         ├── RegistrationTests.cs      # inscription de bout en bout, concurrence, journaux, migrations à jour
         ├── SessionTests.cs           # connexion, /me, jetons falsifiés, rotation, vol, expirations, déconnexion, concurrence
+        ├── ThrottlingTests.cs        # blocages, e-mail inconnu, débit par adresse (IPv6 /64), 50 essais simultanés, 503
+        ├── AccountSecurityTests.cs   # changement de mot de passe, « tout déconnecter », course avec un renouvellement
         ├── ContractTests.cs          # le noyau respecte core-v1.yaml, dans les deux sens
         ├── SchemaValidatorTests.cs   # le validateur maison rejette bien ce qu'il prétend vérifier
-        └── Infrastructure/           # noyau en mémoire (clé de signature jetable), PostgreSQL jetable migrée, capture des journaux
+        └── Infrastructure/           # noyau en mémoire (clé jetable, réglages et adresse client par test), PostgreSQL
+                                      # jetable migrée, capture des journaux, compteur de hachages, commit mis en pause
 ```
 
 - **Exécution :** le programme cible `net10.0` et tourne sur le runtime **.NET 10 LTS** (ADR-0001) ; le SDK 11
@@ -219,10 +227,18 @@ core/
   Tous partagent une seule source de connexions (`NpgsqlDataSource`) enregistrée par l'hôte.
 - **Comptes (`identity.accounts`) :** `id` UUID v7 (identifiant stable, le seul que les autres systèmes stockeront),
   `email` normalisé unique, `pseudo` tel que saisi + `pseudo_normalized` unique (casse ignorée), `password_hash`
-  Argon2id au format PHC (paramètres inclus, durcissables plus tard), `created_at`. Unicité garantie par la base.
+  Argon2id au format PHC (paramètres inclus, durcissables plus tard), `created_at`, `tokens_valid_after` (voir
+  « Tout déconnecter »). Unicité garantie par la base.
 - **Inscription :** `POST /v1/accounts` → 202 (créé, **ou** e-mail déjà utilisé : indiscernable exprès), 400 / 409 en
   Problem Details (RFC 9457) avec un code machine par erreur. Mot de passe normalisé NFKC avant contrôle et hachage.
+  Les deux cas « 202 » exécutent **exactement les mêmes requêtes** : contrôle du pseudo, hachage, une seule requête
+  `INSERT … ON CONFLICT DO NOTHING` (l'unicité est vérifiée par la base, sans exception, donc sans erreur dans les
+  journaux), puis contrôle du pseudo de nouveau (il distingue une course perdue sur le pseudo → 409).
   Ni l'e-mail ni le mot de passe ne sont journalisés.
+- **Mots de passe courants :** refusés à l'inscription et au changement (`password_too_common`) : liste embarquée de
+  29 961 mots de passe issus de fuites (SecLists, licence MIT ; ≥ 12 caractères, NFKC, minuscules ; source et empreintes
+  dans `Passwords/common-passwords.SOURCES.md`), plus les mots du contexte (pseudo, partie de l'e-mail avant `@`,
+  « eudoria », à partir de 4 caractères). Pas vérifié à la connexion.
 - **Sessions (`identity.refresh_tokens`) :** une ligne par jeton de renouvellement : `id`, `account_id` (clé étrangère,
   suppression en cascade), `family_id` (= une session, toutes les rotations d'une connexion), `token_hash` (**SHA-256**
   unique : la valeur du jeton n'est jamais stockée), `created_at`, `expires_at` (7 jours), `session_expires_at`
@@ -230,6 +246,18 @@ core/
 - **Connexion :** `POST /v1/auth/login` → 200 avec une paire de jetons (`Cache-Control: no-store`), ou 401
   `invalid_credentials` identique pour un e-mail inconnu et un mauvais mot de passe (vérification contre une empreinte
   factice dans le premier cas, même durée). Une empreinte à un ancien coût Argon2id est **ré-hachée** au coût actuel.
+  La session n'est ouverte que si l'empreinte vérifiée est toujours celle du compte (ligne du compte verrouillée) :
+  un changement de mot de passe simultané ne laisse pas passer l'ancien mot de passe.
+- **Limitation des tentatives :** (1) échecs de connexion comptés par **e-mail + adresse du client** (5 gratuits, puis
+  blocage 1, 2, 4, 8, 15 min ; remis à zéro par un succès, oubliés après 24 h) et par **e-mail seul** (20 en 15 min →
+  15 min), que le compte existe ou non ; pendant un blocage, **le mot de passe n'est pas vérifié** (429
+  `too_many_attempts` + `Retry-After`, identique pour un e-mail inconnu). Les essais en cours comptent d'avance (50 essais
+  simultanés → au plus 5 vérifiés). Compteurs **en mémoire**, bornés (100 000 clés), clés = HMAC-SHA-256 avec un secret
+  tiré au démarrage (aucun e-mail ni adresse en clair) ; remis à zéro si le noyau redémarre. (2) **Débit par adresse**
+  (limiteur intégré d'ASP.NET Core, fenêtre glissante) : connexion 30/min, inscription 10/h, renouvellement 60/min,
+  changement de mot de passe et « tout déconnecter » 30/min. Adresse = IPv4, ou **préfixe /64** en IPv6 (un particulier
+  dispose souvent d'un bloc /64 entier). (3) Au plus **4 hachages Argon2id simultanés** ; au-delà de 10 s d'attente,
+  503 `server_busy`. Tous les seuils sont dans `appsettings.json` (`Identity:Throttling`).
 - **Jeton d'accès :** JWT signé **ES256** (ECDSA P-256), 15 min, en-tête `alg`/`kid`/`typ`, revendications `sub` (UUID du
   compte), `iss` et `aud` = `eudoria-core`, `iat`, `exp`, `jti` — rien d'autre. Vérifié sans base de données : ES256
   seul, notre clé, notre émetteur, audience `eudoria-core` seule, signature et expiration obligatoires, 30 s de
@@ -239,12 +267,23 @@ core/
   de façon atomique (transaction + verrou de ligne). Un jeton **déjà consommé** présenté à nouveau révoque **toute la
   session** (signe de vol ; version stricte, décision du porteur). `POST /v1/auth/logout` révoque la session et répond
   toujours 204. Le jeton d'accès déjà remis reste valable jusqu'à son expiration (≤ 15 min).
+- **Tout déconnecter :** `POST /v1/me/sessions/revoke-all` (jeton d'accès obligatoire, pas de mot de passe) → 204 :
+  toutes les sessions du compte sont révoquées et `tokens_valid_after` avance à la seconde suivante. À **chaque appel
+  protégé**, après la signature, le noyau lit cette date (une lecture par clé primaire) et refuse un jeton dont `iat`
+  est antérieur : les jetons d'accès déjà remis sont coupés **immédiatement**, celui de l'appel compris. Les jetons
+  sont toujours émis à partir de cette date (une reconnexion dans la même seconde fonctionne). Le renouvellement
+  verrouille la ligne du compte (`FOR SHARE`) : un « tout déconnecter » simultané l'attend puis révoque aussi le
+  nouveau jeton.
+- **Changement de mot de passe :** `POST /v1/me/password` (`currentPassword`, `newPassword`) → 200 avec une nouvelle
+  paire : en une transaction, nouvelle empreinte, toutes les sessions révoquées, `tokens_valid_after` avancée, nouvelle
+  session pour cet appareil. 400 si le nouveau mot de passe est refusé (règles, liste, contexte, identique à l'actuel :
+  `password_unchanged`) ; 401 `invalid_credentials` si l'actuel est faux, compté comme une connexion (par compte + adresse).
 - **Profil :** `GET /v1/me` (jeton d'accès obligatoire) → `id`, `pseudo`, `createdAt` (pas l'e-mail) ; sinon 401 avec
   `WWW-Authenticate: Bearer`.
 - **Configuration :** la chaîne de connexion vient de `ConnectionStrings:Core` (variable d'environnement
   `ConnectionStrings__Core`) et la clé de signature de `Identity:Tokens:SigningKey` (variable
   `Identity__Tokens__SigningKey`, lue dans `.env` par `run-core.ps1`). Sans l'une ou l'autre, le noyau **refuse de démarrer**.
-  Les autres réglages des jetons (durées, émetteur, audience) sont dans `appsettings.json`.
+  Les autres réglages (durées des jetons, émetteur, audience, limites) sont dans `appsettings.json`.
 - **Santé :** `live` ne touche à rien (le processus répond) ; `ready` exécute `SELECT 1` sur PostgreSQL avec
   un délai maximum de 2 s et répond 503 sinon. Aucune réponse ne contient de détail interne : les causes
   sont dans les journaux du serveur seulement.

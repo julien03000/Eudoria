@@ -1,6 +1,6 @@
 # Étape 1.4 — Protections : limitation des tentatives, mots de passe courants, changement de mot de passe
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (les 8 recommandations du § 11) — 🟡 en cours de réalisation
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (les 8 recommandations du § 11 + compléments du § 11.1) — ✅ réalisé, **en attente de la validation du porteur** (compte rendu : § 15)
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.4 **uniquement** : tout ce qui a été reporté en 1.4 par les plans 1.2 et 1.3 et par la
@@ -291,6 +291,15 @@ les e-mails inconnus ; retirer le contrôle `tokens_valid_after` ; retirer le ve
 8. **Noms des routes** — **recommandé : `POST /v1/me/password` et `POST /v1/me/sessions/revoke-all`** (sous `/me` :
    tout ce qui concerne son propre compte). Alternative : `PUT /v1/me/password` et `DELETE /v1/me/sessions`.
 
+### 11.1 Choix du porteur (2026-11-24)
+
+Les **8 recommandations** sont acceptées, avec ces compléments :
+
+| # | Décision |
+|---|---|
+| 1 | **Limite par adresse en IPv6 : préfixe /64** comme clé (un particulier dispose souvent d'un bloc /64 entier : compter adresse par adresse permettrait de contourner la limite). IPv4 inchangé. Test dédié. |
+| 2 | **Liste de mots de passe** : le porteur a demandé de privilégier une liste de plusieurs millions d'entrées et une source française. Sources présentées (SecLists, licence MIT) : `Pwdb_top-10000000.txt` (10 millions, 94,5 Mo) ou `Pwdb_top-1000000.txt` (1 million, 8,8 Mo), plus `French-common-password-list-top-20000.txt` (155 Ko). **Choix du porteur : 1 million + liste française.** Téléchargées dans `E:\Dev\_downloads\seclists` (jamais commitées). |
+
 ## 12. Risques
 
 | Risque | Parade |
@@ -326,3 +335,33 @@ sur la source exacte (nom du fichier, taille, licence).
 10. `docs(architecture): describe throttling and password change` (+ `PROGRESS.md`, `ROADMAP.md`)
 
 Puis envoi de la branche sur GitHub. Rien ne commence avant ton « OK » sur ce plan (et sur les 8 points du § 11).
+
+## 15. Écarts constatés pendant la réalisation
+
+| Prévu | Réalisé | Pourquoi |
+|---|---|---|
+| Liste « de plusieurs millions d'entrées » (§ 11.1) | 1 million + liste française → **29 961 entrées** gardées (≥ 12 caractères), **427 029 octets** (417 Kio) | Choix du porteur ; comme prévu, un top limité ne garde que quelques dizaines de milliers de mots de passe longs (16 seulement viennent de la liste française) |
+| `Passwords/common-passwords.txt` avec la source en tête | Source, empreintes SHA-256 et comptes dans un fichier à part, `common-passwords.SOURCES.md` | Un mot de passe peut commencer par `#` : le fichier de liste ne contient que des entrées |
+| — | Le script décode la notation `$HEX[…]` des listes (mots de passe contenant des octets particuliers) | Sinon ces entrées seraient restées illisibles |
+| Dossier `Account/` (changement de mot de passe, tout déconnecter) | Dossier **`AccountSecurity/`**, un seul fichier pour les deux routes (`AccountSecurityEndpoints.cs`) | `Account` est déjà le nom de l'entité : un dossier (espace de noms) du même nom crée des confusions de compilation |
+| Commits 5 et 6 séparés (compteurs / débit + hachages) | Un seul commit `feat(identity): throttle failed logins and rate-limit authentication routes` | Les trois mécanismes partagent options, réponses 429/503 et tests |
+| Renouvellement : vérifier que la session a été ouverte après `tokens_valid_after` (§ 7.3) | **Inutile** : le verrou `FOR SHARE` sur la ligne du compte suffit (un « tout déconnecter » qui passe en premier a déjà révoqué le jeton ; sinon il attend et révoque le nouveau) | Moins de code, même garantie ; prouvé par un test déterministe |
+| — | **Connexion :** la session n'est ouverte que si l'empreinte vérifiée est **toujours** celle du compte (ligne verrouillée) | Sans ça, une connexion avec l'**ancien** mot de passe lancée pendant un changement de mot de passe pouvait ouvrir une session qui survit |
+| — | Les jetons sont **émis à partir de** `tokens_valid_after` (au plus 1 s dans le futur) | Sinon une reconnexion dans la même seconde qu'un « tout déconnecter » recevait un jeton aussitôt refusé |
+| Hachages limités dans `Argon2idPasswordHasher` | Classe séparée **`PasswordHashingGate`** (attente asynchrone), utilisée par l'inscription, la connexion et le changement de mot de passe | L'interface du hacheur est synchrone : attendre dedans bloquerait des fils du serveur |
+| Fenêtre « e-mail seul » glissante | Fenêtre **fixe** de 15 min, qui repart au premier échec suivant | Plus simple ; même ordre de grandeur de protection |
+| Champ `request` et code `server_busy` non listés au plan | Ajoutés au contrat : 429 et 503 portent `{"field":"request", …}` ; 503 `server_busy` documenté sur les 3 routes qui hachent | Une erreur de limite ne concerne aucun champ du corps |
+| Banc de test | `CoreApiFactory` accepte des réglages par test et une **adresse client simulée** (en-tête de test `X-Test-Client-Address`) ; limites par adresse relevées par défaut dans les tests ; `CountingPasswordHasher` partagé (remplace deux copies) ; `PausingCommitInterceptor` (met en pause un commit pour rejouer une course) | Nécessaire pour tester les limites, l'IPv6 et la course de façon fiable |
+| `docs/ROADMAP.md` (cases cochées) | **Non cochées** | Les critères de l'étape sont cochés quand tu valides ; aucune case n'avait été cochée pour 1.1 à 1.3 |
+
+### Résultats et constats
+
+| Point | Résultat |
+|---|---|
+| Tests | **229 passent** (99 unitaires du module + 130 intégration/contrat ; 168 avant la 1.4), build 0 avertissement, `dotnet format` propre |
+| Tests de mutation | Mot de passe vérifié pendant un blocage → 5 tests échouent ; e-mails inconnus non comptés → 2 ; contrôle `tokens_valid_after` retiré → 3 ; verrou du renouvellement retiré → 2 (dont le test déterministe) ; 2e contrôle du pseudo retiré du chemin « succès » → 1 ; IPv6 compté adresse par adresse → 5 ; liste de mots de passe ignorée → 8. **Les 7 mutations sont détectées** |
+| Inscription égalisée | Test : les deux chemins exécutent **les 3 mêmes requêtes SQL** (contrôle du pseudo, `INSERT … ON CONFLICT DO NOTHING`, contrôle du pseudo) ; aucun message d'erreur ni d'avertissement dans les journaux, même pendant 10 inscriptions simultanées du même pseudo. L'ancien code fait échouer ces deux tests |
+| Lancement réel (limites par défaut) | `migrate.ps1` applique `AddTokensValidAfter`. Par appels HTTP : mot de passe courant → 400 `password_too_common` ; 6 mauvais mots de passe → 401 ×5 puis **429**, `Retry-After: 60` ; **bon** mot de passe pendant le blocage → 429 ; e-mail inconnu → même 429 ; changement de mot de passe → 200 `no-store`, ancien jeton d'accès → 401 sur `/me`, autre appareil → 401 (accès et renouvellement), nouveau jeton → 200, ancien mot de passe → 401, nouveau → 200 ; tout déconnecter → 204, puis jeton et renouvellement → 401, reconnexion immédiate → `/me` 200 ; **11e inscription** depuis la même adresse dans l'heure → 429, `Retry-After: 600` |
+| Journal réel | **Aucune ligne `fail:`** ni `warn:` ; ni e-mail, ni mot de passe |
+| Mesures de durée | **Non concluantes** : pendant les mesures, le poste faisait tourner un jeu (3,2 Go) avec **0,6 Go de RAM libre** et ~30 % de processeur occupé ; toutes les durées étaient 2 à 3 fois plus longues qu'en 1.3 (inscription ~165–245 ms, connexion ~150–210 ms) et le bruit atteignait ±15 ms. Écarts des médianes (3 séries de 30 inscriptions) : +17,9 / +5,7 / −3,8 ms ; connexion (3 × 20) : −6,3 / −15,8 / +7,0 ms → **aucune direction constante**, mais le critère « < 1 ms » ne peut pas être vérifié dans ces conditions. L'égalité est en revanche **prouvée par le test** des requêtes SQL identiques. À refaire sur un poste au repos |
+| Coût du contrôle `tokens_valid_after` | `/me` : médiane 15 ms sur 50 appels (poste chargé, journaux réduits) ; non isolé du reste |
