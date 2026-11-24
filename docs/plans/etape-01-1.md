@@ -1,6 +1,6 @@
 # Étape 1.1 — Squelette du noyau + environnement local + route « santé »
 
-- **Statut :** ✅ Réalisé le 2026-11-24 (OK du porteur le 2026-11-24) — en attente de validation de la 1.1
+- **Statut :** ✅ Réalisé le 2026-11-24 (OK du porteur le 2026-11-24) — **sous-étape validée par le porteur le 2026-11-24**
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.1 **uniquement**. Aucun compte, aucune table, aucun Entity Framework : tout ça est la 1.2.

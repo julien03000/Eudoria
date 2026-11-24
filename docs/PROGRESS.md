@@ -48,10 +48,11 @@
     en 5.8, reçoit `MaxParallelActions` et lit `MemoryPerActionBytes` → **inutile de désactiver l'UBA**.
     Confirmation pratique (nombre de tâches parallèles dans le journal d'UBT) à la première compilation (1.5).
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
+- **Plan de la sous-étape 1.2** rédigé (`docs/plans/etape-01-2.md`), **en attente du « OK » du porteur**.
 - **Plan de la sous-étape 1.1** (`docs/plans/etape-01-1.md`) validé par le porteur (SDK 11 épinglé, cache NuGet sur E:, dépendances).
 - **ROADMAP** : sous-étape **1.7 — Test de rendu** ajoutée (scène après connexion, troisième personne en C++,
   Lumen + Nanite, assets Fab gratuits, mesures images/s / mémoire vidéo / RAM notées dans `docs/`, validation de l'ADR-0003).
-- **Sous-étape 1.1 réalisée (2026-11-24), en attente de validation du porteur** :
+- **Sous-étape 1.1 réalisée et ✅ validée par le porteur le 2026-11-24** :
   - cache NuGet redirigé : variable utilisateur `NUGET_PACKAGES = E:\Dev\NuGet\packages` ;
   - `.gitignore` : règles .NET ajoutées, règles `*.sln`/`*.slnx` limitées à `unreal/` ;
   - contrat `shared/api/core-v1.yaml` (OpenAPI 3.1) : `GET /v1/health/live`, `GET /v1/health/ready` ;
@@ -91,7 +92,6 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Le porteur **valide la sous-étape 1.1** (procédure de test : `docs/SETUP.md`, section « Lancer le noyau en local »).
-2. Ensuite seulement : proposer le plan détaillé de la **sous-étape 1.2** (modèle de compte, migrations EF Core,
-   inscription `POST /v1/...` décrite d'abord dans `core-v1.yaml`, premier module `Eudoria.Core.Identity`),
-   l'écrire dans `docs/plans/etape-01-2.md` et attendre le « OK ».
+1. Le porteur relit le plan de la **sous-étape 1.2** (`docs/plans/etape-01-2.md` : modèle de compte, migrations
+   EF Core, inscription `POST /v1/accounts`, module `Eudoria.Core.Identity`) et tranche les **points de décision du § 9**.
+2. Après son « OK » seulement : réaliser la 1.2 selon ce plan (commits du § 11), puis envoyer la branche sur GitHub.
