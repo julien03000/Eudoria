@@ -117,7 +117,8 @@
 | Réglages éditeur 5.8 | `%LOCALAPPDATA%\UnrealEngine\5.8` | 0,12 Go | À garder (installation actuelle) |
 
 ## ⚠️ Problèmes connus / points d'attention
-- **Mesures de durée de la 1.4 à refaire sur un poste au repos** (inscription « nouvel e-mail » / « e-mail utilisé »,
+- **Tâche non bloquante (décision du porteur, 2026-11-24) : refaire plus tard, PC au repos, les mesures de durée de la 1.4**
+  (aucun jeu ni gros programme ouvert ; ne bloque pas la 1.5). Mesures : inscription « nouvel e-mail » / « e-mail utilisé »,
   connexion « e-mail inconnu » / « mauvais mot de passe ») : pendant la mesure, un jeu tournait (0,6 Go de RAM libre),
   bruit de ±15 ms. L'égalité des requêtes est prouvée par un test ; seule la mesure chiffrée manque.
 - **Dette (1.4)** : compteurs d'échecs **en mémoire** (remis à zéro au redémarrage du noyau, non partagés entre plusieurs
@@ -148,6 +149,10 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
+- *Non bloquant, quand le PC est au repos :* refaire les mesures de durée de la 1.4 (voir « Problèmes connus »).
+- **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
+  local » remplis pour le noyau, en attente du client Unreal).
+
 1. Sur demande du porteur seulement : proposer le plan de la **sous-étape 1.5** (création du projet Unreal en C++,
    plugin socle `EudoriaCore`, Git LFS, client minimal : écrans « Créer un compte », « Se connecter », « Bienvenue »),
    l'écrire dans `docs/plans/etape-01-5.md` et attendre le « OK ». **Ne pas commencer la 1.5 sans son accord.**

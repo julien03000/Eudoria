@@ -95,15 +95,15 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 ### Critères de validation
 - [ ] Je peux créer un compte depuis le client Unreal sur PC, puis me connecter avec.
 - [ ] Le client Unreal ne contient aucune logique dans les graphes Blueprint (vérifié par script).
-- [ ] Deux comptes ne peuvent pas avoir le même pseudo ni le même e-mail.
-- [ ] Un mauvais mot de passe est refusé ; après N échecs, les tentatives sont temporairement bloquées.
-- [ ] Le mot de passe n'apparaît en clair ni en base, ni dans les logs.
-- [ ] Un jeton expiré ou falsifié est refusé par l'API.
-- [ ] Après déconnexion, le jeton de renouvellement ne fonctionne plus.
+- [x] Deux comptes ne peuvent pas avoir le même pseudo ni le même e-mail. *(1.2, garanti par la base, testé en concurrence)*
+- [x] Un mauvais mot de passe est refusé ; après N échecs, les tentatives sont temporairement bloquées. *(1.3 + 1.4)*
+- [x] Le mot de passe n'apparaît en clair ni en base, ni dans les logs. *(1.2 à 1.4, tests des journaux + lancement réel)*
+- [x] Un jeton expiré ou falsifié est refusé par l'API. *(1.3)*
+- [x] Après déconnexion, le jeton de renouvellement ne fonctionne plus. *(1.3 ; et « tout déconnecter » coupe aussi les jetons d'accès, 1.4)*
 - [ ] Un composant tiers (simulé dans les tests) peut vérifier un jeton et obtenir l'identifiant du compte.
 - [ ] Après connexion, la scène de test (Lumen + Nanite, assets Fab) tourne de façon **fluide en qualité Haute** sur le poste du porteur, et les mesures (images/s, mémoire vidéo, RAM) sont notées dans `docs/`.
-- [ ] Les tests passent, sans erreur de compilation ni de lint.
-- [ ] Tout se lance en local en suivant une procédure écrite de quelques commandes.
+- [ ] Les tests passent, sans erreur de compilation ni de lint. *(rempli pour le noyau à la 1.4 : 229 tests ; reste le client Unreal)*
+- [ ] Tout se lance en local en suivant une procédure écrite de quelques commandes. *(rempli pour le noyau : `docs/SETUP.md` + scripts `tools/dev/` ; reste le client Unreal)*
 
 ### Découpage prévisionnel (à confirmer au démarrage de l'étape)
 1. Squelette du noyau + environnement local (base de données, configuration, une route « santé »).
