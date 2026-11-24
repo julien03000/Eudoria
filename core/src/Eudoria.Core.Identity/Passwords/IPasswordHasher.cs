@@ -8,4 +8,10 @@ internal interface IPasswordHasher
 
     /// <summary>Checks a password against a hash produced by <see cref="Hash"/>, in constant time.</summary>
     bool Verify(string password, string hash);
+
+    /// <summary>
+    /// True when a valid hash was made with other cost parameters than the current ones: after a
+    /// successful login, the password should then be hashed again (it is only known at that moment).
+    /// </summary>
+    bool NeedsRehash(string hash);
 }

@@ -49,6 +49,10 @@ internal sealed class Argon2idPasswordHasher(Argon2idOptions options) : IPasswor
         return CryptographicOperations.FixedTimeEquals(actual, expected);
     }
 
+    public bool NeedsRehash(string hash) =>
+        TryParse(hash, out int memoryKib, out int passes, out _, out _)
+        && (memoryKib != options.MemoryKib || passes != options.Passes);
+
     private static Argon2id CreateAlgorithm(int memoryKib, int passes) =>
         PasswordBasedKeyDerivationAlgorithm.Argon2id(new Argon2Parameters
         {

@@ -311,5 +311,7 @@ public sealed class RegistrationTests(PostgresFixture database)
         }
 
         public bool Verify(string password, string hash) => _inner.Verify(password, hash);
+
+        public bool NeedsRehash(string hash) => _inner.NeedsRehash(hash);
     }
 }
