@@ -1,3 +1,4 @@
+using System.Globalization;
 using Eudoria.Core.Identity.Accounts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -21,4 +22,26 @@ internal static class ProblemResults
     /// <summary>400 for a body that cannot be read at all.</summary>
     public static JsonHttpResult<object> BodyInvalid() =>
         Problem(StatusCodes.Status400BadRequest, "Bad Request", [new FieldError("body", AccountRules.ErrorCodes.BodyInvalid)]);
+
+    /// <summary>429 too_many_attempts, with Retry-After (whole seconds, rounded up, at least 1).</summary>
+    public static JsonHttpResult<object> TooManyRequests(HttpContext context, TimeSpan retryAfter)
+    {
+        SetRetryAfter(context, retryAfter);
+        return Problem(StatusCodes.Status429TooManyRequests, "Too Many Requests",
+            [new FieldError("request", AccountRules.ErrorCodes.TooManyAttempts)]);
+    }
+
+    /// <summary>503 server_busy, with Retry-After: no password hashing slot became free in time.</summary>
+    public static JsonHttpResult<object> ServerBusy(HttpContext context)
+    {
+        SetRetryAfter(context, TimeSpan.FromSeconds(1));
+        return Problem(StatusCodes.Status503ServiceUnavailable, "Service Unavailable",
+            [new FieldError("request", AccountRules.ErrorCodes.ServerBusy)]);
+    }
+
+    private static void SetRetryAfter(HttpContext context, TimeSpan retryAfter)
+    {
+        long seconds = Math.Max(1, (long)Math.Ceiling(retryAfter.TotalSeconds));
+        context.Response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
+    }
 }

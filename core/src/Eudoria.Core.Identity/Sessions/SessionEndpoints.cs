@@ -1,5 +1,6 @@
 using Eudoria.Core.Identity.Accounts;
 using Eudoria.Core.Identity.Http;
+using Eudoria.Core.Identity.Throttling;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -22,11 +23,18 @@ internal static class SessionEndpoints
             return ProblemResults.BodyInvalid();
         }
 
-        TokenPair? pair = await sessions.LoginAsync(fields.GetValueOrDefault("email"), fields.GetValueOrDefault("password"), cancellationToken);
-        return pair is null
+        LoginResult result = await sessions.LoginAsync(
+            fields.GetValueOrDefault("email"), fields.GetValueOrDefault("password"),
+            ClientAddress.Key(context.Connection.RemoteIpAddress), cancellationToken);
+        if (result.RetryAfter is { } retryAfter)
+        {
+            return ProblemResults.TooManyRequests(context, retryAfter);
+        }
+
+        return result.Tokens is null
             ? ProblemResults.Problem(StatusCodes.Status401Unauthorized, "Unauthorized",
                 [new FieldError("credentials", AccountRules.ErrorCodes.InvalidCredentials)])
-            : Tokens(context, pair);
+            : Tokens(context, result.Tokens);
     }
 
     public static async Task<IResult> RefreshAsync(HttpContext context, SessionService sessions, CancellationToken cancellationToken)
@@ -57,7 +65,7 @@ internal static class SessionEndpoints
     }
 
     /// <summary>Token responses must never be cached (RFC 6749, section 5.1).</summary>
-    private static JsonHttpResult<TokenPair> Tokens(HttpContext context, TokenPair pair)
+    internal static JsonHttpResult<TokenPair> Tokens(HttpContext context, TokenPair pair)
     {
         context.Response.Headers.CacheControl = "no-store";
         return TypedResults.Json(pair);

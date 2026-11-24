@@ -1,6 +1,7 @@
 using Eudoria.Core.Identity.Accounts;
 using Eudoria.Core.Identity.Passwords;
 using Eudoria.Core.Identity.Persistence;
+using Eudoria.Core.Identity.Throttling;
 using Eudoria.Core.Identity.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -11,6 +12,12 @@ namespace Eudoria.Core.Identity.Sessions;
 
 /// <summary>Body of a successful login or renewal (contract schema TokenPair).</summary>
 internal sealed record TokenPair(string AccessToken, string TokenType, long ExpiresIn, string RefreshToken, long RefreshExpiresIn);
+
+/// <summary>Outcome of a login: tokens, wrong credentials (both null), or too many attempts (<see cref="RetryAfter"/>).</summary>
+internal sealed record LoginResult(TokenPair? Tokens, TimeSpan? RetryAfter)
+{
+    public static readonly LoginResult InvalidCredentials = new(null, null);
+}
 
 /// <summary>
 /// A hash of a random password at the current cost, computed once. Verifying against it when the
@@ -32,6 +39,8 @@ internal sealed partial class SessionService(
     IdentityDbContext database,
     IPasswordHasher passwordHasher,
     DummyPasswordHash dummyHash,
+    PasswordHashingGate hashingGate,
+    LoginThrottle throttle,
     AccessTokenIssuer accessTokens,
     IOptions<TokenOptions> options,
     TimeProvider time,
@@ -40,16 +49,34 @@ internal sealed partial class SessionService(
     /// <summary>Longer passwords are refused without hashing (registration allows 128 code points).</summary>
     public const int MaxLoginPasswordLength = 1024;
 
-    /// <summary>Returns a token pair, or null for wrong credentials (unknown e-mail and wrong password alike).</summary>
-    public async Task<TokenPair?> LoginAsync(string? email, string? password, CancellationToken cancellationToken)
+    /// <summary>Counter scope of failed logins (<see cref="LoginThrottle"/>).</summary>
+    public const string LoginScope = "login";
+
+    /// <summary>
+    /// Returns a token pair, wrong credentials (unknown e-mail and wrong password alike), or a
+    /// refusal when too many attempts failed for this e-mail (blocked: the password is not checked).
+    /// </summary>
+    public async Task<LoginResult> LoginAsync(string? email, string? password, string clientKey, CancellationToken cancellationToken)
     {
         string normalizedEmail = AccountRules.NormalizeEmail(email ?? string.Empty);
+
+        // Counted per e-mail whether it has an account or not: a 429 must not reveal that it exists.
+        using ThrottledAttempt attempt = throttle.TryBegin(LoginScope, normalizedEmail, clientKey);
+        if (!attempt.Allowed)
+        {
+            LogLoginThrottled(logger);
+            return new LoginResult(null, attempt.RetryAfter);
+        }
+
         string? normalizedPassword = AccountRules.NormalizePassword(password ?? string.Empty);
         if (normalizedPassword is null || normalizedPassword.Length > MaxLoginPasswordLength)
         {
+            attempt.Failed();
             LogLoginFailed(logger);
-            return null;
+            return LoginResult.InvalidCredentials;
         }
+
+        using PasswordHashingGate.Slot slot = await hashingGate.EnterAsync(cancellationToken);
 
         var account = await database.Accounts.AsNoTracking()
             .Where(candidate => candidate.Email == normalizedEmail)
@@ -60,9 +87,12 @@ internal sealed partial class SessionService(
         bool verified = passwordHasher.Verify(normalizedPassword, account?.PasswordHash ?? dummyHash.Value);
         if (account is null || !verified)
         {
+            attempt.Failed();
             LogLoginFailed(logger);
-            return null;
+            return LoginResult.InvalidCredentials;
         }
+
+        attempt.Succeeded();
 
         if (passwordHasher.NeedsRehash(account.PasswordHash))
         {
@@ -72,7 +102,7 @@ internal sealed partial class SessionService(
         DateTimeOffset now = time.GetUtcNow();
         TokenPair pair = await IssueAsync(account.Id, familyId: Guid.CreateVersion7(now), now + options.Value.SessionLifetime, now, cancellationToken);
         LogLoggedIn(logger, account.Id);
-        return pair;
+        return new LoginResult(pair, null);
     }
 
     /// <summary>Consumes a refresh token and returns a new pair in the same session, or null when it is not usable.</summary>
@@ -215,6 +245,9 @@ internal sealed partial class SessionService(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Login failed: unknown e-mail or wrong password.")]
     private static partial void LogLoginFailed(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Login refused: too many failed attempts for this e-mail (not checked).")]
+    private static partial void LogLoginThrottled(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Password hash of account {AccountId} upgraded to the current cost.")]
     private static partial void LogRehashed(ILogger logger, Guid accountId);

@@ -513,16 +513,16 @@ public sealed class SessionTests(PostgresFixture database)
         return await ReadJsonAsync(response);
     }
 
-    private static Task<HttpResponseMessage> LoginAsync(HttpClient client, string email, string password) =>
+    internal static Task<HttpResponseMessage> LoginAsync(HttpClient client, string email, string password) =>
         PostJsonAsync(client, "/v1/auth/login", LoginJson(email, password));
 
-    private static Task<HttpResponseMessage> RefreshAsync(HttpClient client, string refreshToken) =>
+    internal static Task<HttpResponseMessage> RefreshAsync(HttpClient client, string refreshToken) =>
         PostJsonAsync(client, "/v1/auth/refresh", RefreshTokenJson(refreshToken));
 
-    private static Task<HttpResponseMessage> LogoutAsync(HttpClient client, string refreshToken) =>
+    internal static Task<HttpResponseMessage> LogoutAsync(HttpClient client, string refreshToken) =>
         PostJsonAsync(client, "/v1/auth/logout", RefreshTokenJson(refreshToken));
 
-    private static async Task<HttpResponseMessage> GetMeAsync(HttpClient client, string? accessToken)
+    internal static async Task<HttpResponseMessage> GetMeAsync(HttpClient client, string? accessToken)
     {
         using HttpRequestMessage request = new(HttpMethod.Get, new Uri("/v1/me", UriKind.Relative));
         if (accessToken is not null)
@@ -533,13 +533,13 @@ public sealed class SessionTests(PostgresFixture database)
         return await client.SendAsync(request, Cancellation);
     }
 
-    private static async Task<HttpResponseMessage> PostJsonAsync(HttpClient client, string route, string body)
+    internal static async Task<HttpResponseMessage> PostJsonAsync(HttpClient client, string route, string body)
     {
         using StringContent content = new(body, Encoding.UTF8, "application/json");
         return await client.PostAsync(new Uri(route, UriKind.Relative), content, Cancellation);
     }
 
-    private static async Task<JsonNode> ReadJsonAsync(HttpResponseMessage response) =>
+    internal static async Task<JsonNode> ReadJsonAsync(HttpResponseMessage response) =>
         JsonNode.Parse(await response.Content.ReadAsStringAsync(Cancellation))!;
 
     /// <summary>A token like the core's, signed with the core's key unless other credentials are given.</summary>
@@ -609,24 +609,5 @@ public sealed class SessionTests(PostgresFixture database)
         byte[] hash = RefreshTokenValue.TryHash(refreshToken)!;
         await using IdentityDbContext identity = database.CreateIdentityDbContext();
         await identity.RefreshTokens.Where(token => token.TokenHash == hash).ExecuteUpdateAsync(setters, Cancellation);
-    }
-
-    /// <summary>Real Argon2id hasher that also counts verifications.</summary>
-    private sealed class CountingPasswordHasher : IPasswordHasher
-    {
-        private readonly Argon2idPasswordHasher _inner = new(Argon2idOptions.Default);
-        private int _verifyCount;
-
-        public int VerifyCount => _verifyCount;
-
-        public string Hash(string password) => _inner.Hash(password);
-
-        public bool Verify(string password, string hash)
-        {
-            Interlocked.Increment(ref _verifyCount);
-            return _inner.Verify(password, hash);
-        }
-
-        public bool NeedsRehash(string hash) => _inner.NeedsRehash(hash);
     }
 }

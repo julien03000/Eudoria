@@ -30,6 +30,7 @@ internal sealed partial class RegistrationService(
     IdentityDbContext database,
     IPasswordHasher passwordHasher,
     CommonPasswords commonPasswords,
+    PasswordHashingGate hashingGate,
     TimeProvider time,
     ILogger<RegistrationService> logger)
 {
@@ -70,7 +71,12 @@ internal sealed partial class RegistrationService(
         // logged as an error), then the pseudo check again, in every case.
         DateTimeOffset now = time.GetUtcNow();
         Guid id = Guid.CreateVersion7(now);
-        string passwordHash = passwordHasher.Hash(password);
+        string passwordHash;
+        using (await hashingGate.EnterAsync(cancellationToken))
+        {
+            passwordHash = passwordHasher.Hash(password);
+        }
+
         bool inserted = await TryInsertAsync(id, email, pseudo, pseudoNormalized, passwordHash, now, cancellationToken);
 
         // Only matters when nothing was inserted: a simultaneous registration took the pseudo.

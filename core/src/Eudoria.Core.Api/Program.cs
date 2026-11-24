@@ -11,6 +11,9 @@ builder.Services.AddHealthChecks()
 
 WebApplication app = builder.Build();
 
+// Request rate limits per client address (IPv4, or IPv6 /64) on the authentication routes.
+app.UseRateLimiter();
+
 // Access tokens (Bearer, ES256) are checked before any protected route runs.
 app.UseAuthentication();
 app.UseAuthorization();

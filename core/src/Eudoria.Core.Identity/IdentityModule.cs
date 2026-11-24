@@ -3,9 +3,11 @@ using Eudoria.Core.Identity.Persistence;
 using Eudoria.Core.Identity.Profile;
 using Eudoria.Core.Identity.Registration;
 using Eudoria.Core.Identity.Sessions;
+using Eudoria.Core.Identity.Throttling;
 using Eudoria.Core.Identity.Tokens;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -30,7 +32,8 @@ public static class IdentityModule
         "Generate it once with tools/dev/new-signing-key.ps1, then run the core with tools/dev/run-core.ps1.";
 
     /// <summary>
-    /// Registers the module's services. Requires the host to register the shared
+    /// Registers the module's services. The host must also call <c>UseRateLimiter()</c> (limits per
+    /// client address, plan 1.4). Requires the host to register the shared
     /// <see cref="NpgsqlDataSource"/> (one connection pool for the whole core).
     /// The core refuses to start without a valid signing key.
     /// </summary>
@@ -42,6 +45,16 @@ public static class IdentityModule
         services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
         services.AddSingleton<DummyPasswordHash>();
         services.AddSingleton<CommonPasswords>();
+        services.AddSingleton<PasswordHashingGate>();
+        services.AddSingleton<LoginThrottle>();
+
+        services.AddOptions<ThrottlingOptions>()
+            .BindConfiguration(ThrottlingOptions.SectionName)
+            .Validate(options => options.IsValid(), "Invalid 'Identity:Throttling' settings.")
+            .ValidateOnStart();
+        services.AddRateLimiter(_ => { });
+        services.AddOptions<RateLimiterOptions>()
+            .Configure<IOptions<ThrottlingOptions>>((limiter, throttling) => RateLimitPolicies.Configure(limiter, throttling.Value));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<RegistrationService>();
         services.AddScoped<SessionService>();
@@ -70,9 +83,12 @@ public static class IdentityModule
     /// <summary>Maps the module's public routes under the given version group (e.g. /v1).</summary>
     public static RouteGroupBuilder MapIdentityEndpoints(this RouteGroupBuilder api)
     {
-        api.MapPost("/accounts", RegistrationEndpoint.RegisterAsync);
-        api.MapPost("/auth/login", SessionEndpoints.LoginAsync);
-        api.MapPost("/auth/refresh", SessionEndpoints.RefreshAsync);
+        api.MapPost("/accounts", RegistrationEndpoint.RegisterAsync)
+            .RequireRateLimiting(RateLimitPolicies.Registration).WithHashingBusyAnswer();
+        api.MapPost("/auth/login", SessionEndpoints.LoginAsync)
+            .RequireRateLimiting(RateLimitPolicies.Login).WithHashingBusyAnswer();
+        api.MapPost("/auth/refresh", SessionEndpoints.RefreshAsync)
+            .RequireRateLimiting(RateLimitPolicies.Refresh);
         api.MapPost("/auth/logout", SessionEndpoints.LogoutAsync);
         api.MapGet("/me", MeEndpoint.GetAsync).RequireAuthorization();
         return api;
