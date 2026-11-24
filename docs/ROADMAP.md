@@ -126,6 +126,9 @@ taille des assets (impact sur le quota Git LFS, ADR-0005), conditions de licence
 convient pas, alternatives.
 **Livrable :** éditeur d'avatar dans le client Unreal (apparence de base, couleurs, quelques vêtements) ; les paramètres de l'avatar sont stockés par le noyau et rattachés au compte.
 **Validation :** l'ADR avatar est validé ; je personnalise mon avatar, je me reconnecte depuis un autre poste, je retrouve exactement le même avatar.
+**Idée future (à décider au démarrage de l'étape, choix du porteur du 2026-11-24) :** un **« nom d'affichage » libre**
+(accents, autres alphabets), distinct du **pseudo unique** (ASCII, sert d'identifiant public, étape 1.2). Il faudra alors
+traiter les noms « sosies » (caractères qui se ressemblent d'un alphabet à l'autre) et la modération.
 
 ## Étape 3 — Premier environnement multijoueur
 

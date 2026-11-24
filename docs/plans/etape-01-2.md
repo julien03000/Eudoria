@@ -1,6 +1,6 @@
 # Étape 1.2 — Modèle de compte + migrations + inscription
 
-- **Statut :** 📝 Proposé le 2026-11-24 — **en attente du « OK » du porteur** (et de ses choix au § 9)
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (choix au § 9.1) — réalisation en cours
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.2 **uniquement** : créer un compte. Pas de connexion, pas de jeton, pas de
@@ -123,7 +123,7 @@ Table `identity.accounts` (schéma PostgreSQL **propre au module** : chaque modu
 |---|---|
 | E-mail | Espaces de début/fin retirés, mis en minuscules ; 254 caractères max ; exactement un `@`, une partie avant et un domaine contenant un point après ; aucun espace ni caractère de contrôle. (Pas de vérification « l'adresse existe » : il faudrait un envoi réel, exclu.) |
 | Pseudo | **3 à 20 caractères**, lettres **A–Z / a–z**, chiffres, `_` et `-` ; commence par une lettre ; unicité sans tenir compte des majuscules |
-| Mot de passe | **12 à 128 caractères** ; tous les caractères autorisés (espaces, accents, émojis) ; **aucune** règle du type « une majuscule + un symbole » (recommandation actuelle du NIST : la longueur compte, pas la complexité imposée) ; le maximum évite qu'un mot de passe géant coûte cher à hacher |
+| Mot de passe | **Normalisé en Unicode NFKC** (recommandation NIST SP 800-63B-4) **avant** tout contrôle et avant le hachage, pour qu'un même mot de passe fonctionne quel que soit le clavier/système (PC, Mac, mobile, VR) ; puis **12 à 128 caractères**, comptés en caractères Unicode (points de code) ; tous les caractères autorisés (espaces, accents, émojis) ; **aucune** règle du type « une majuscule + un symbole » (le NIST recommande la longueur, pas la complexité imposée) ; le maximum évite qu'un mot de passe géant coûte cher à hacher |
 
 Toutes les erreurs de champ sont renvoyées **ensemble** (pas une par une), pour un formulaire agréable.
 
@@ -160,6 +160,7 @@ Aucun compte n'est créé, et l'événement est journalisé **sans l'e-mail**.
 | règles e-mail / pseudo / mot de passe (cas valides, limites, caractères interdits) | unitaire | les règles du § 6.2, y compris aux bornes (2/3/20/21 caractères…) |
 | normalisation e-mail et pseudo | unitaire | `  Ana@Example.COM ` → `ana@example.com` |
 | Argon2id : vérifie le bon mot de passe, refuse un mauvais, sel différent à chaque fois, format PHC | unitaire | le hachage |
+| NFKC : `é` composé (U+00E9) et `e` + accent combinant (U+0065 U+0301), ou chiffre pleine largeur `１` et `1`, donnent le même mot de passe ; la longueur est comptée après normalisation | unitaire | la normalisation Unicode |
 | inscription valide → 202, ligne en base, mot de passe **absent** de la base | intégration | le cas nominal |
 | pseudo déjà pris (même casse et casse différente) → 409 | intégration | unicité du pseudo |
 | e-mail déjà pris → 202 identique, **aucun** second compte | intégration | non-révélation de l'e-mail |
@@ -194,7 +195,7 @@ Les versions exactes seront vérifiées (dernière 10.0.x stable) au moment de c
 1. **E-mail déjà utilisé** (§ 6.4) — **recommandé : réponse identique à une réussite (202)**, conforme à l'exigence
    « ne pas révéler si un e-mail existe ». Alternative : répondre clairement « e-mail déjà utilisé » (409),
    plus simple pour l'utilisateur mais qui permet à n'importe qui de tester si une adresse a un compte.
-2. **Librairie Argon2id** — **recommandé : `Konscious.Security.Cryptography.Argon2`** (100 % .NET, aucune
+2. **Librairie Argon2id** — ~~recommandé : `Konscious.Security.Cryptography.Argon2`~~ (choix du porteur : NSec, voir § 9.1) (100 % .NET, aucune
    bibliothèque native à embarquer, la plus utilisée en .NET). Alternative : `NSec.Cryptography` (s'appuie sur
    libsodium, référence en cryptographie, mais ajoute un composant natif). Je vérifierai avant de coder
    l'activité de maintenance et la licence de celle retenue, et je te le dirai si quelque chose cloche.
@@ -206,7 +207,20 @@ Les versions exactes seront vérifiées (dernière 10.0.x stable) au moment de c
    doit être un geste volontaire). Alternative : migration automatique au démarrage en développement uniquement.
 5. **Validation de schéma dans les tests de contrat** — **recommandé : étendre le petit validateur maison** (aucune
    dépendance, les schémas restent modestes). Alternative : une librairie JSON Schema (à choisir, licence à vérifier).
-6. **Mot de passe : 12 caractères minimum** — ou préfères-tu 8 (minimum NIST) / 10 ?
+6. **Mot de passe : 12 caractères minimum** — ou préfères-tu une autre valeur ? *(Correction : la version actuelle du NIST,
+   SP 800-63B-4, recommande **15** caractères minimum pour un mot de passe utilisé seul, 8 seulement avec une double
+   authentification. La mention « 8 (minimum NIST) » de la première version de ce plan était inexacte.)*
+
+### 9.1 Choix du porteur (2026-11-24)
+
+| # | Décision |
+|---|---|
+| 1 | E-mail déjà utilisé : **réponse identique à une réussite (202)**. |
+| 2 | Argon2id : **`NSec.Cryptography`** (libsodium). Vérifié avant de coder, le 2026-11-24 : version **26.4.0** (30/04/2026), licence **MIT** ; libsodium **1.0.22**, licence **ISC** ; dépôt `ektrah/nsec` actif (non archivé, 2 tickets ouverts, publications régulières depuis 2024). Aucun problème relevé. NSec exige 1 seul fil de calcul (`p = 1`) et un sel de 16 octets : identique aux paramètres prévus. |
+| 3 | Pseudo : règles du § 6.2 acceptées. Idée future notée dans la ROADMAP : un **« nom d'affichage » libre** (accents, autres alphabets), distinct du pseudo unique. |
+| 4 | Migrations : par **`migrate.ps1`**. |
+| 5 | Validateur de schéma : **maison**, étendu. |
+| 6 | Mot de passe : **12 caractères minimum** (sous les 15 du NIST pour un mot de passe seul, choix assumé du porteur pour le prototype) ; **normalisation Unicode NFKC avant le hachage**, avec un test dédié (même mot de passe saisi sous deux formes Unicode différentes → accepté). |
 
 ## 10. Risques
 
