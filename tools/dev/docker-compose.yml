@@ -1,0 +1,30 @@
+# EUDORIA — local development environment (ADR-0002).
+# Do not run directly: use tools/dev/start-db.ps1, which passes the repository's .env file.
+name: eudoria
+
+services:
+  db:
+    # Exact version pinned on purpose; upgrade deliberately.
+    image: postgres:18.7
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is missing from .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing from .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is missing from .env}
+    ports:
+      # Loopback only: the database is not exposed to the local network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Since PostgreSQL 18 the image stores data under /var/lib/postgresql/<major>/,
+      # so the volume is mounted on the parent folder.
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  # Stored by Docker Desktop in E:\Dev\Docker\Data (WSL data root).
+  db-data:
