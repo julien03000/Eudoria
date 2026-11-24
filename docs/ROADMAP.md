@@ -86,6 +86,11 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 5. **Tests automatisés** : unitaires (règles de validation, hachage) et d'intégration (API complète contre une vraie base de test) côté noyau ; tests d'automatisation Unreal pour la partie C++ du client (appel au noyau, gestion des erreurs).
 6. **Documentation** : contrat de l'API (OpenAPI, `shared/api/`), mise à jour de `ARCHITECTURE.md` et `PROGRESS.md`.
 7. **Mise en place technique** : Git LFS activé dans le dépôt, cache de données dérivées d'Unreal déplacé sur E:.
+8. **Scène de test de rendu** (sous-étape 1.7) : après la connexion, le joueur arrive dans une petite scène
+   où il se déplace à la troisième personne (personnage de base d'Unreal, logique en **C++**), avec **Lumen** et
+   **Nanite** activés et quelques assets photoréalistes **gratuits de Fab** (licence vérifiée pour chaque asset,
+   cache de Fab redirigé vers E:, taille ajoutée à Git LFS surveillée). But : mesurer les performances réelles
+   sur le poste du porteur (images/s, mémoire vidéo, RAM) et **valider l'ADR-0003**.
 
 ### Critères de validation
 - [ ] Je peux créer un compte depuis le client Unreal sur PC, puis me connecter avec.
@@ -96,6 +101,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 - [ ] Un jeton expiré ou falsifié est refusé par l'API.
 - [ ] Après déconnexion, le jeton de renouvellement ne fonctionne plus.
 - [ ] Un composant tiers (simulé dans les tests) peut vérifier un jeton et obtenir l'identifiant du compte.
+- [ ] Après connexion, la scène de test (Lumen + Nanite, assets Fab) tourne de façon **fluide en qualité Haute** sur le poste du porteur, et les mesures (images/s, mémoire vidéo, RAM) sont notées dans `docs/`.
 - [ ] Les tests passent, sans erreur de compilation ni de lint.
 - [ ] Tout se lance en local en suivant une procédure écrite de quelques commandes.
 
@@ -106,6 +112,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 4. Protections (limitation des tentatives, validations).
 5. Création du projet Unreal (C++, plugin socle, Git LFS) et client minimal.
 6. Vérification de jeton par un service tiers.
+7. Test de rendu : scène de test après connexion (troisième personne en C++, Lumen, Nanite, assets Fab gratuits), mesures de performances notées dans `docs/`, validation de l'ADR-0003.
 
 ---
 
