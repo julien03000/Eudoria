@@ -3,9 +3,10 @@
 > À mettre à jour à la fin de chaque session.
 
 **Dernière mise à jour :** 2026-11-24
-**Étape en cours :** Phase 0 — Fondations du projet (branche `main`)
+**Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
+**Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
-## ✅ Fait
+## ✅ Fait (Phase 0)
 - Git installé (2.56.1, avec Git LFS 3.8.1), dépôt initialisé sur `main`.
 - `docs/ROADMAP.md` : étapes 0 à 10 ; étape 1 détaillée (client Unreal minimal) ; étape 2 commence par l'évaluation de MetaHuman ; étape 3 a pour prérequis le passage à 32 Go de RAM et la compilation d'Unreal depuis les sources.
 - `docs/ARCHITECTURE.md` (révision 2) : noyau .NET / mondes en serveurs dédiés Unreal (plugins Game Feature) / clients Unreal ; schémas Mermaid ; structure du dépôt.
@@ -33,7 +34,7 @@
 - PC redémarré ; licence Docker acceptée par le porteur. **Docker testé** : client et serveur 29.9.3, `docker run --rm hello-world` réussi ; distribution `docker-desktop` en WSL 2 ; données dans `E:\Dev\Docker\Data` (1,5 Go). C: : 68,8 Go libres après redémarrage.
 
 ## 🟡 En cours
-- **Phase 0 terminée de mon côté, en attente de ta validation** : tous ses critères (ROADMAP) sont remplis.
+- Étape 1 démarrée : branche `etape-01-identite` créée ; plan des sous-étapes 1.0 (préparation du poste) et 1.1 (squelette du noyau) présenté, en attente du « OK » du porteur. Aucun code écrit.
 
 ## 🧹 Traces de l'ancienne installation d'Unreal (décisions du porteur, 2026-11-24)
 
@@ -58,7 +59,6 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Le porteur valide la Phase 0 (passage à 🟢 dans la ROADMAP).
-2. Créer la branche `etape-01-identite` et proposer le plan de la sous-étape 1.1
-   (squelette du noyau + environnement local + route « santé »).
-3. Au début de l'étape 1 : rediriger le DDC/Zen d'Unreal vers E:, **puis** supprimer les anciens caches DDC et Zen ; créer `BuildConfiguration.xml` avec la limite de compilations parallèles.
+1. Obtenir le « OK » du porteur sur le plan des sous-étapes 1.0 et 1.1, puis les réaliser sur `etape-01-identite`
+   - **1.0 Préparation du poste** : rediriger le DDC/Zen d'Unreal vers E:, **puis** supprimer les anciens caches DDC et Zen ; créer `BuildConfiguration.xml` avec la limite de compilations parallèles.
+   - **1.1 Squelette du noyau** : projet ASP.NET Core (net10.0), contrat OpenAPI des routes « santé », PostgreSQL via Docker Compose, configuration par `.env`, tests, formatage.

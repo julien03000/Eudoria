@@ -7,8 +7,8 @@ Une étape = une branche git (`etape-XX-nom`), fusionnée dans `main` après ta 
 
 | # | Étape | Statut |
 |---|-------|--------|
-| 0 | Fondations du projet | 🟡 En cours |
-| 1 | Identité numérique | ⚪ À faire |
+| 0 | Fondations du projet | 🟢 Validée (2026-11-24) |
+| 1 | Identité numérique | 🟡 En cours |
 | 2 | Création et personnalisation des avatars | ⚪ À faire |
 | 3 | Premier environnement multijoueur | ⚪ À faire |
 | 4 | Déplacements et interactions | ⚪ À faire |
