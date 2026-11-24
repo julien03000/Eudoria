@@ -116,6 +116,9 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
    - **supprimer l'erreur EF Core des journaux** pour un e-mail déjà utilisé (cas normal, pas une panne).
 5. Création du projet Unreal (C++, plugin socle, Git LFS) et client minimal.
 6. Vérification de jeton par un service tiers.
+   Les serveurs de monde ne reçoivent jamais le jeton d'accès du noyau : le noyau délivre un ticket d'entrée de
+   courte durée, avec une audience propre à chaque monde. Il faut concevoir ce mécanisme en 1.6.
+   (Décision du porteur, 2026-11-24 : le jeton d'accès porte l'audience `eudoria-core` et n'est accepté que par le noyau.)
 7. Test de rendu : scène de test après connexion (troisième personne en C++, Lumen, Nanite, assets Fab gratuits), mesures de performances notées dans `docs/`, validation de l'ADR-0003.
 
 ---

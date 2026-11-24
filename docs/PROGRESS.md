@@ -92,6 +92,9 @@
 ## ⚠️ Problèmes connus / points d'attention
 - **Reporté en 1.4 (décision du porteur)**, inscrit dans le découpage de la ROADMAP : écart de durée de ~5 ms pour un
   e-mail déjà utilisé, et erreur EF Core (`fail:`, sans donnée sensible) dans les journaux dans ce même cas.
+- **Dette (décision du porteur, 2026-11-24, plan 1.3)** : renouvellement strict — si la réponse d'un renouvellement est
+  perdue (réseau instable) et que le client réessaie, la session est coupée. Prévoir un éventuel **délai de grâce**
+  quand les clients mobile et VR arriveront.
 - Comptes créés en 1.2 avec l'ancien coût Argon2id (19 Mio / 2 passes) : seront ré-hachés à la connexion en 1.3.
 - **Sauvegarde** : le dépôt est sur GitHub ; la seconde sauvegarde indépendante recommandée par l'ADR-0006 (disque externe) n'est pas encore en place.
 - Quota LFS gratuit de GitHub : 10 Gio de stockage et 10 Gio de téléchargement par mois — à surveiller dès l'arrivée des premiers assets.
