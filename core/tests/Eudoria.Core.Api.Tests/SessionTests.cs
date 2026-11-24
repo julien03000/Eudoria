@@ -384,6 +384,23 @@ public sealed class SessionTests(PostgresFixture database)
         Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
     }
 
+    [Fact]
+    public async Task TokenOfALoggedOutSession_IsRefused_WithoutATheftWarning()
+    {
+        CapturingLoggerProvider logs = new();
+        await using CoreApiFactory factory = new(database.ConnectionString, logs);
+        using HttpClient client = factory.CreateClient();
+        (string email, _) = await RegisterAsync(client);
+        string refreshToken = (await LoginJsonAsync(client, email))["refreshToken"]!.GetValue<string>();
+        using HttpResponseMessage logout = await LogoutAsync(client, refreshToken);
+
+        using HttpResponseMessage refresh = await RefreshAsync(client, refreshToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+        Assert.Contains(logs.Entries, entry => entry.Contains("closed session", StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Contains("theft", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
     [InlineData("not-a-token")]

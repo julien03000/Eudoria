@@ -167,8 +167,17 @@ internal sealed partial class SessionService(
 
     private async Task RevokeReusedSessionAsync(RefreshToken token, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        // Only cutting a still-active session is a sign of theft; a token of a closed session
+        // (logged out, or already revoked) is just refused.
         int revoked = await RevokeSessionAsync(token.FamilyId, now, cancellationToken);
-        LogRevokedTokenPresented(logger, token.AccountId, token.FamilyId, revoked);
+        if (revoked > 0)
+        {
+            LogReuseDetected(logger, token.AccountId, token.FamilyId, revoked);
+        }
+        else
+        {
+            LogClosedSessionTokenPresented(logger, token.AccountId, token.FamilyId);
+        }
     }
 
     private Task<int> RevokeSessionAsync(Guid familyId, DateTimeOffset now, CancellationToken cancellationToken) =>
@@ -185,10 +194,13 @@ internal sealed partial class SessionService(
         try
         {
             string newHash = passwordHasher.Hash(password);
-            await database.Accounts
+            int updated = await database.Accounts
                 .Where(account => account.Id == accountId && account.PasswordHash == oldHash)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(account => account.PasswordHash, newHash), cancellationToken);
-            LogRehashed(logger, accountId);
+            if (updated > 0)
+            {
+                LogRehashed(logger, accountId);
+            }
         }
         catch (Exception exception) when (exception is DbUpdateException or InvalidOperationException or Npgsql.NpgsqlException)
         {
@@ -211,8 +223,11 @@ internal sealed partial class SessionService(
     private static partial void LogRehashFailed(ILogger logger, Guid accountId, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning,
-        Message = "Revoked refresh token presented for account {AccountId}: session {FamilyId} revoked ({RevokedCount} active token(s)). Possible token theft.")]
-    private static partial void LogRevokedTokenPresented(ILogger logger, Guid accountId, Guid familyId, int revokedCount);
+        Message = "Consumed refresh token reused for account {AccountId}: session {FamilyId} revoked ({RevokedCount} active token(s)). Possible token theft.")]
+    private static partial void LogReuseDetected(ILogger logger, Guid accountId, Guid familyId, int revokedCount);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Refresh token of closed session {FamilyId} (account {AccountId}) refused.")]
+    private static partial void LogClosedSessionTokenPresented(ILogger logger, Guid accountId, Guid familyId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Account {AccountId} logged out.")]
     private static partial void LogLoggedOut(ILogger logger, Guid accountId);
