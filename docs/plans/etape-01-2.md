@@ -1,6 +1,6 @@
 # Étape 1.2 — Modèle de compte + migrations + inscription
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (choix au § 9.1) — ✅ réalisé le 2026-11-24, en attente de validation de la 1.2
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (choix au § 9.1) — ✅ réalisé, puis **sous-étape validée par le porteur le 2026-11-24**
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.2 **uniquement** : créer un compte. Pas de connexion, pas de jeton, pas de
@@ -269,6 +269,7 @@ outil dotnet-ef 10.0.15.
 | Tests | **102 passent** (54 unitaires du module + 48 intégration/contrat), build 0 avertissement, `dotnet format` propre |
 | Tests de mutation | NFKC retiré → 7 tests échouent ; traitement de la course au pseudo retiré → le test de concurrence échoue |
 | Lancement réel | `migrate.ps1` crée `identity.accounts` ; `curl` : 202 / 409 `pseudo_taken` / 202 pour e-mail déjà pris / 400 avec 3 codes / 400 `body_invalid` ; empreinte `$argon2id$v=19$m=19456,t=2,p=1$…` en base |
-| Coût d'Argon2id | **13,7 ms** par hachage sur ce poste (Ryzen 9 3900X), **sous la cible de 50 à 200 ms** du § 6.3 : les paramètres OWASP minimum sont rapides sur ce processeur. Paramètres **inchangés** (décision au porteur, voir PROGRESS) |
-| « Même durée » pour un e-mail déjà pris | Le hachage a bien lieu dans les deux cas (test dédié). Mais à chaud, l'e-mail déjà pris répond **~5 ms plus lentement** (≈ 37 ms contre ≈ 32 ms, 5 mesures sur 5) : échec de l'insertion + requête de contrôle. Écart mesurable par statistiques → à traiter (voir PROGRESS) |
-| Journaux | Ni e-mail ni mot de passe. Mais EF Core journalise chaque e-mail déjà pris comme **erreur** (`fail:`, pile d'appels, détail masqué par Npgsql) : bruit à traiter (voir PROGRESS) |
+| Coût d'Argon2id (1re mesure) | **13,7 ms** par hachage sur ce poste (Ryzen 9 3900X) avec 19 Mio / 2 passes : **sous la cible de 50 à 200 ms** du § 6.3 |
+| **Coût d'Argon2id retenu** (décision du porteur, 2026-11-24) | **64 Mio, 3 passes, p = 1** — 2e option recommandée par la RFC 9106 (mémoire limitée), p = 1 imposé par libsodium. Mesure sur le poste : médiane **75 à 87 ms** (3 séries de 5 hachages, test `ProductionCost_IsTheChosenSetting_AndReallyCostsTime`) → **dans la cible**, le repli 46 Mio / 2 passes n'a pas été nécessaire. Les comptes déjà créés (19 Mio / 2 passes, empreinte auto-descriptive) seront ré-hachés à la connexion en 1.3. Les 102 tests passent avec ce réglage |
+| « Même durée » pour un e-mail déjà pris | Le hachage a bien lieu dans les deux cas (test dédié). Mais à chaud, l'e-mail déjà pris répond **~5 ms plus lentement** (≈ 37 ms contre ≈ 32 ms, 5 mesures sur 5, avec l'ancien coût Argon2id) : échec de l'insertion + requête de contrôle. **Reporté en 1.4** (décision du porteur, inscrit dans la ROADMAP) |
+| Journaux | Ni e-mail ni mot de passe. Mais EF Core journalise chaque e-mail déjà pris comme **erreur** (`fail:`, pile d'appels, détail masqué par Npgsql). **Reporté en 1.4** (décision du porteur, inscrit dans la ROADMAP) |

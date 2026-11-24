@@ -109,7 +109,11 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 1. Squelette du noyau + environnement local (base de données, configuration, une route « santé »).
 2. Modèle de compte + migrations + inscription.
 3. Connexion, jetons, renouvellement, déconnexion.
-4. Protections (limitation des tentatives, validations).
+4. Protections (limitation des tentatives, validations), dont les reports de la 1.2 (décision du porteur, 2026-11-24) :
+   - inscription : **vérifier l'e-mail avant l'insertion** au lieu d'attendre le refus de la base ;
+   - **égaliser le chemin** « e-mail déjà utilisé » et « inscription réussie » (mêmes requêtes, même durée ; écart de ~5 ms mesuré en 1.2) ;
+   - **garder la capture des courses** (refus d'unicité de PostgreSQL lors d'inscriptions simultanées → mêmes réponses) ;
+   - **supprimer l'erreur EF Core des journaux** pour un e-mail déjà utilisé (cas normal, pas une panne).
 5. Création du projet Unreal (C++, plugin socle, Git LFS) et client minimal.
 6. Vérification de jeton par un service tiers.
 7. Test de rendu : scène de test après connexion (troisième personne en C++, Lumen, Nanite, assets Fab gratuits), mesures de performances notées dans `docs/`, validation de l'ADR-0003.

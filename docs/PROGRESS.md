@@ -49,13 +49,15 @@
     Confirmation pratique (nombre de tâches parallèles dans le journal d'UBT) à la première compilation (1.5).
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
 - **Plan de la sous-étape 1.2 validé** le 2026-11-24 (choix du porteur : § 9.1 du plan ; NSec vérifié : MIT, maintenu).
-- **Sous-étape 1.2 réalisée (2026-11-24), en attente de validation du porteur** :
+- **Sous-étape 1.2 réalisée et ✅ validée par le porteur le 2026-11-24** :
   - contrat `POST /v1/accounts` (core-v1 1.1.0) ; module `Eudoria.Core.Identity` (règles, NFKC, Argon2id via NSec,
     modèle, migration `CreateAccounts`, route) ; `tools/dev/migrate.ps1` ;
   - **102 tests passent** (unitaires, intégration, concurrence, journaux, contrat), build 0 avertissement, format propre ;
     tests de mutation : NFKC retiré et course au pseudo cassée → détectés ;
   - **vérifié en lancement réel** (migration, noyau, inscriptions par `curl`, table inspectée) — détail : § 12 du plan ;
-  - **Smart App Control désactivé par le porteur** le 2026-11-24 (il bloquait les DLL recompilées).
+  - **Smart App Control désactivé par le porteur** le 2026-11-24 (il bloquait les DLL recompilées) ;
+  - **Argon2id porté à 64 Mio / 3 passes / p = 1** (RFC 9106, décision du porteur) : médiane **75–87 ms** par hachage sur le
+    poste, dans la cible 50–200 ms ; les comptes existants seront ré-hachés à la connexion (1.3) ; 102 tests passent.
 - **Plan de la sous-étape 1.1** (`docs/plans/etape-01-1.md`) validé par le porteur (SDK 11 épinglé, cache NuGet sur E:, dépendances).
 - **ROADMAP** : sous-étape **1.7 — Test de rendu** ajoutée (scène après connexion, troisième personne en C++,
   Lumen + Nanite, assets Fab gratuits, mesures images/s / mémoire vidéo / RAM notées dans `docs/`, validation de l'ADR-0003).
@@ -88,13 +90,9 @@
 | Réglages éditeur 5.8 | `%LOCALAPPDATA%\UnrealEngine\5.8` | 0,12 Go | À garder (installation actuelle) |
 
 ## ⚠️ Problèmes connus / points d'attention
-- **Argon2id rapide sur ce poste** : 13,7 ms par hachage avec les paramètres OWASP minimum (19 Mio, 2 passes), sous la
-  cible de 50–200 ms du plan 1.2. Proposition : relever le coût (ex. 46 Mio / 1 passe ou 19 Mio / 6 passes) — à décider.
-- **Écart de durée « e-mail déjà pris »** : ~5 ms de plus qu'une inscription réussie (insertion échouée + requête).
-  Exploitable seulement par mesures répétées ; la limitation des tentatives (1.4) le rendra impraticable. Proposition :
-  égaliser le chemin (même nombre de requêtes) en 1.4.
-- **Bruit dans les journaux** : chaque e-mail déjà pris produit une erreur EF Core (`fail:` + pile d'appels), sans donnée
-  sensible. Proposition : vérifier l'e-mail avant l'insertion (garder la capture pour les courses), en même temps que le point précédent.
+- **Reporté en 1.4 (décision du porteur)**, inscrit dans le découpage de la ROADMAP : écart de durée de ~5 ms pour un
+  e-mail déjà utilisé, et erreur EF Core (`fail:`, sans donnée sensible) dans les journaux dans ce même cas.
+- Comptes créés en 1.2 avec l'ancien coût Argon2id (19 Mio / 2 passes) : seront ré-hachés à la connexion en 1.3.
 - **Sauvegarde** : le dépôt est sur GitHub ; la seconde sauvegarde indépendante recommandée par l'ADR-0006 (disque externe) n'est pas encore en place.
 - Quota LFS gratuit de GitHub : 10 Gio de stockage et 10 Gio de téléchargement par mois — à surveiller dès l'arrivée des premiers assets.
 - **.NET** : Visual Studio 18.12 a installé le SDK **11** (et non 10). Le runtime .NET 10 LTS est présent et le SDK 11 compile pour net10.0 : conforme à l'ADR-0001. Décision (2026-11-24) : SDK 11 épinglé par `global.json`, cible `net10.0`.
@@ -106,8 +104,6 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Le porteur **valide la sous-étape 1.2** (procédure : `docs/SETUP.md`, « Lancer le noyau en local » — ajouter
-   `migrate.ps1` — puis l'exemple « Créer un compte ») et tranche les 3 propositions de « Problèmes connus » (coût
-   Argon2id, écart de durée, bruit des journaux).
-2. Ensuite seulement : proposer le plan de la **sous-étape 1.3** (connexion, jetons d'accès et de renouvellement,
-   déconnexion), l'écrire dans `docs/plans/etape-01-3.md` et attendre le « OK ».
+1. Sur demande du porteur seulement : proposer le plan de la **sous-étape 1.3** (connexion, jetons d'accès et de
+   renouvellement, déconnexion, **ré-hachage à la connexion** des empreintes Argon2id à l'ancien coût), l'écrire dans
+   `docs/plans/etape-01-3.md` et attendre le « OK ». **Ne pas commencer la 1.3 sans son accord.**
