@@ -1,6 +1,6 @@
 # ADR-0006 — Hébergement du dépôt distant
 
-- **Statut :** Proposé
+- **Statut :** Accepté (validé par le porteur de projet le 2026-11-24 : GitHub, dépôt privé)
 - **Date :** 2026-11-24
 - **Liée à :** ADR-0005 (fichiers binaires, Git LFS)
 

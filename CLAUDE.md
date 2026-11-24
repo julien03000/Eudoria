@@ -47,10 +47,16 @@ Une tâche n'est terminée que si :
 - Commits petits et fréquents, format : `type(zone): description`
   (types : `feat`, `fix`, `docs`, `refactor`, `test`, `chore`).
 - Jamais de `push --force`, `rebase` ou suppression de branche sans ma demande.
+- Dépôt distant : GitHub (`origin`, HTTPS). Authentification par le gestionnaire d'identifiants de Git
+  (Git Credential Manager) : **c'est moi qui me connecte** dans la fenêtre GitHub ;
+  **jamais de jeton ou mot de passe dans un fichier**, une URL ou une commande.
+- Assets binaires : verrouiller (`git lfs lock`) avant de modifier un `.uasset`/`.umap`, déverrouiller après l'envoi.
 
 ## Fin de session
-Avant de terminer une session, mets à jour `docs/PROGRESS.md` :
-ce qui est fait, ce qui est en cours, les problèmes connus, et **la prochaine étape exacte**.
+Avant de terminer une session :
+1. mets à jour `docs/PROGRESS.md` : ce qui est fait, ce qui est en cours, les problèmes connus, et **la prochaine étape exacte** ;
+2. fais le commit ;
+3. **envoie (push) sur GitHub** la ou les branches concernées.
 
 ## Principes d'architecture (issus de la vision)
 - Le **noyau** (identité, comptes, avatars, persistance, inventaire, économie, registre des mondes)
@@ -74,7 +80,8 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
 - **Réseau** : réplication native Unreal + **serveurs dédiés** ; un monde = un plugin **Game Feature** qui ne
   dépend que du plugin socle `EudoriaCore` ; moteur compilé depuis les sources à partir de l'étape 3 — ADR-0004.
 - **Fichiers binaires** : **Git LFS** avec verrouillage (`.uasset`, `.umap` verrouillables) — ADR-0005.
-- **Hébergement du dépôt distant** : à décider — ADR-0006 (Proposé).
+- **Hébergement du dépôt distant** : **GitHub, dépôt privé** `julien03000/eudoria`
+  (https://github.com/julien03000/eudoria), remote `origin`, en HTTPS — ADR-0006.
 
 ## Environnement
 - **Règle d'installation : tout sur E:.** Le disque C: n'a qu'environ 50 Go libres ; seuls les composants
