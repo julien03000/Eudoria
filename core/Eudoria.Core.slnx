@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Eudoria.Core.Api/Eudoria.Core.Api.csproj" />
+    <Project Path="src/Eudoria.Core.Identity/Eudoria.Core.Identity.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Eudoria.Core.Api.Tests/Eudoria.Core.Api.Tests.csproj" />
+    <Project Path="tests/Eudoria.Core.Identity.Tests/Eudoria.Core.Identity.Tests.csproj" />
   </Folder>
 </Solution>

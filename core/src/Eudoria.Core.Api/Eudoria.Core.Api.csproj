@@ -8,4 +8,8 @@
     <PackageReference Include="Npgsql" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Eudoria.Core.Identity\Eudoria.Core.Identity.csproj" />
+  </ItemGroup>
+
 </Project>
