@@ -22,6 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Common passwords refused at registration and password change (tools/dev/build-password-blocklist.ps1). -->
+    <EmbeddedResource Include="Passwords\common-passwords.txt" LogicalName="Eudoria.Core.Identity.common-passwords.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Eudoria.Core.Identity.Tests" />
     <InternalsVisibleTo Include="Eudoria.Core.Api.Tests" />
   </ItemGroup>

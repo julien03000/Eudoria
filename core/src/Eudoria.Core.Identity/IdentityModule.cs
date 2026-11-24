@@ -41,6 +41,7 @@ public static class IdentityModule
         services.AddSingleton(Argon2idOptions.Default);
         services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
         services.AddSingleton<DummyPasswordHash>();
+        services.AddSingleton<CommonPasswords>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<RegistrationService>();
         services.AddScoped<SessionService>();

@@ -27,7 +27,11 @@ internal sealed record RegistrationResult(RegistrationOutcome Outcome, IReadOnly
 
 /// <summary>Creates accounts. Never logs the e-mail or the password.</summary>
 internal sealed partial class RegistrationService(
-    IdentityDbContext database, IPasswordHasher passwordHasher, TimeProvider time, ILogger<RegistrationService> logger)
+    IdentityDbContext database,
+    IPasswordHasher passwordHasher,
+    CommonPasswords commonPasswords,
+    TimeProvider time,
+    ILogger<RegistrationService> logger)
 {
     public async Task<RegistrationResult> RegisterAsync(RegistrationRequest request, CancellationToken cancellationToken)
     {
@@ -40,7 +44,13 @@ internal sealed partial class RegistrationService(
         AddError(errors, "pseudo", ValidatePseudo(pseudo));
 
         string? password = NormalizePassword(request.Password ?? string.Empty);
-        AddError(errors, "password", password is null ? ErrorCodes.BodyInvalid : ValidatePassword(password));
+        string? passwordError = password is null ? ErrorCodes.BodyInvalid : ValidatePassword(password);
+        if (passwordError is null && commonPasswords.IsRefused(password!, pseudo, email))
+        {
+            passwordError = ErrorCodes.PasswordTooCommon;
+        }
+
+        AddError(errors, "password", passwordError);
 
         if (errors.Count > 0 || password is null)
         {

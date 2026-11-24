@@ -166,6 +166,38 @@ public sealed class RegistrationTests(PostgresFixture database)
     }
 
     [Theory]
+    [InlineData("azertyuiop123")] // leaked password
+    [InlineData("AzertyUIOP１２３")] // same, other letter case and full-width digits (NFKC)
+    [InlineData("my-eudoria-passphrase")] // service name
+    public async Task CommonPassword_Returns400_PasswordTooCommon_AndCreatesNoAccount(string password)
+    {
+        string pseudo = UniquePseudo();
+        await using CoreApiFactory factory = new(database.ConnectionString);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await RegisterAsync(client, UniqueEmail(), pseudo, password);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(
+            """{"type":"about:blank","title":"Bad Request","status":400,"errors":[{"field":"password","code":"password_too_common"}]}""",
+            await response.Content.ReadAsStringAsync(Cancellation));
+        Assert.Null(await FindByPseudoAsync(pseudo));
+    }
+
+    [Fact]
+    public async Task PasswordContainingThePseudo_Returns400_PasswordTooCommon()
+    {
+        string pseudo = UniquePseudo();
+        await using CoreApiFactory factory = new(database.ConnectionString);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await RegisterAsync(client, UniqueEmail(), pseudo, $"{pseudo.ToUpperInvariant()}-is-me");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(["password_too_common"], await ErrorCodesAsync(response));
+    }
+
+    [Theory]
     [InlineData("{}")]
     [InlineData("""{"email":null,"pseudo":"","password":null}""")]
     public async Task MissingFields_Return400_WithRequiredCodes(string body)
