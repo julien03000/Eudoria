@@ -106,6 +106,51 @@ public sealed class RegistrationTests(PostgresFixture database)
     }
 
     [Fact]
+    public async Task UsedEmail_RunsExactlyTheSameSqlCommandsAsASuccess()
+    {
+        string email = UniqueEmail();
+        CapturingLoggerProvider logs = new();
+        await using CoreApiFactory factory = new(database.ConnectionString, logs);
+        using HttpClient client = factory.CreateClient();
+
+        int before = logs.Entries.Count;
+        using HttpResponseMessage created = await RegisterAsync(client, email, UniquePseudo(), Password);
+        string[] successCommands = SqlCommands(logs.Entries.Skip(before));
+        before = logs.Entries.Count;
+        using HttpResponseMessage emailUsed = await RegisterAsync(client, email, UniquePseudo(), Password);
+        string[] emailUsedCommands = SqlCommands(logs.Entries.Skip(before));
+
+        Assert.Equal(HttpStatusCode.Accepted, created.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, emailUsed.StatusCode);
+        Assert.Equal(3, successCommands.Length); // pseudo check, insert, pseudo check
+        Assert.Equal(successCommands, emailUsedCommands);
+    }
+
+    [Fact]
+    public async Task UsedEmail_AndPseudoRaces_LogNoErrorOrWarning()
+    {
+        string email = UniqueEmail();
+        string pseudo = UniquePseudo();
+        CapturingLoggerProvider logs = new();
+        await using CoreApiFactory factory = new(database.ConnectionString, logs);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage created = await RegisterAsync(client, email, UniquePseudo(), Password);
+        using HttpResponseMessage emailUsed = await RegisterAsync(client, email, UniquePseudo(), Password);
+        HttpResponseMessage[] race = await Task.WhenAll(
+            Enumerable.Range(0, 10).Select(_ => RegisterAsync(client, UniqueEmail(), pseudo, Password)));
+
+        Assert.Equal(HttpStatusCode.Accepted, emailUsed.StatusCode);
+        Assert.Single(race, response => response.StatusCode == HttpStatusCode.Accepted);
+        Assert.Contains(logs.Entries, entry => entry.Contains("e-mail already in use", StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Levels, level => level >= Microsoft.Extensions.Logging.LogLevel.Warning);
+        foreach (HttpResponseMessage response in race)
+        {
+            response.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task SeveralInvalidFields_Return400_WithEveryErrorAtOnce()
     {
         await using CoreApiFactory factory = new(database.ConnectionString);
@@ -281,6 +326,12 @@ public sealed class RegistrationTests(PostgresFixture database)
         using StringContent content = new(body, Encoding.UTF8, "application/json");
         return await client.PostAsync(new Uri("/v1/accounts", UriKind.Relative), content, Cancellation);
     }
+
+    /// <summary>The SQL texts EF Core executed (durations removed; parameter values are never logged).</summary>
+    private static string[] SqlCommands(IEnumerable<string> entries) =>
+        [.. entries
+            .Where(entry => entry.StartsWith("Microsoft.EntityFrameworkCore.Database.Command | Executed DbCommand", StringComparison.Ordinal))
+            .Select(entry => System.Text.RegularExpressions.Regex.Replace(entry.Split(" | ")[1], @"\(\d+ms\)", "(…)"))];
 
     private static async Task<string[]> ErrorCodesAsync(HttpResponseMessage response)
     {

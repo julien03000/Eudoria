@@ -4,7 +4,6 @@ using Eudoria.Core.Identity.Passwords;
 using Eudoria.Core.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using static Eudoria.Core.Identity.Accounts.AccountRules;
 
 namespace Eudoria.Core.Identity.Registration;
@@ -56,41 +55,52 @@ internal sealed partial class RegistrationService(
             return RegistrationResult.PseudoTaken;
         }
 
-        // Hashed in every remaining case, so an already used e-mail takes as long as a new one.
-        Account account = new()
-        {
-            Id = Guid.CreateVersion7(time.GetUtcNow()),
-            Email = email,
-            Pseudo = pseudo,
-            PseudoNormalized = pseudoNormalized,
-            PasswordHash = passwordHasher.Hash(password),
-            CreatedAt = time.GetUtcNow(),
-        };
+        // Same queries and same duration whether the e-mail is new or already used:
+        // hash, one insert that the database skips on any duplicate (no exception, so nothing is
+        // logged as an error), then the pseudo check again, in every case.
+        DateTimeOffset now = time.GetUtcNow();
+        Guid id = Guid.CreateVersion7(now);
+        string passwordHash = passwordHasher.Hash(password);
+        bool inserted = await TryInsertAsync(id, email, pseudo, pseudoNormalized, passwordHash, now, cancellationToken);
 
-        database.Accounts.Add(account);
-        try
+        // Only matters when nothing was inserted: a simultaneous registration took the pseudo.
+        bool pseudoTaken = await IsPseudoTakenByAnotherAsync(pseudoNormalized, id, cancellationToken);
+        if (inserted)
         {
-            await database.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
-        {
-            SqlState: PostgresErrorCodes.UniqueViolation,
-        } violation)
-        {
-            // Lost a race with a simultaneous registration: same answers as the checks above.
-            if (violation.ConstraintName == AccountConfiguration.PseudoIndex
-                || await IsPseudoTakenAsync(pseudoNormalized, cancellationToken))
-            {
-                return RegistrationResult.PseudoTaken;
-            }
-
-            LogEmailAlreadyUsed(logger);
+            LogAccountCreated(logger, id);
             return RegistrationResult.Accepted;
         }
 
-        LogAccountCreated(logger, account.Id);
+        if (pseudoTaken)
+        {
+            return RegistrationResult.PseudoTaken;
+        }
+
+        LogEmailAlreadyUsed(logger);
         return RegistrationResult.Accepted;
     }
+
+    /// <summary>
+    /// INSERT … ON CONFLICT DO NOTHING: the unique indexes on the e-mail and the pseudo are checked
+    /// by the database within the insert itself (no gap between check and insert, even under
+    /// simultaneous registrations). Parameterized: the interpolated values become SQL parameters.
+    /// </summary>
+    private async Task<bool> TryInsertAsync(
+        Guid id, string email, string pseudo, string pseudoNormalized, string passwordHash, DateTimeOffset createdAt,
+        CancellationToken cancellationToken)
+    {
+        List<Guid> inserted = await database.Database.SqlQuery<Guid>($"""
+            INSERT INTO identity.accounts (id, email, pseudo, pseudo_normalized, password_hash, created_at)
+            VALUES ({id}, {email}, {pseudo}, {pseudoNormalized}, {passwordHash}, {createdAt})
+            ON CONFLICT DO NOTHING
+            RETURNING id AS "Value"
+            """).ToListAsync(cancellationToken);
+        return inserted.Count == 1;
+    }
+
+    private Task<bool> IsPseudoTakenByAnotherAsync(string pseudoNormalized, Guid id, CancellationToken cancellationToken) =>
+        database.Accounts.AsNoTracking()
+            .AnyAsync(account => account.PseudoNormalized == pseudoNormalized && account.Id != id, cancellationToken);
 
     private Task<bool> IsPseudoTakenAsync(string pseudoNormalized, CancellationToken cancellationToken) =>
         database.Accounts.AsNoTracking().AnyAsync(account => account.PseudoNormalized == pseudoNormalized, cancellationToken);
