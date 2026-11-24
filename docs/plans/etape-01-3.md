@@ -1,6 +1,6 @@
 # Étape 1.3 — Connexion, jetons d'accès et de renouvellement, déconnexion
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (7 recommandations du § 11 + compléments du § 11.1) — ✅ réalisé le 2026-11-24, **en attente de la validation du porteur**
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-24 (7 recommandations du § 11 + compléments du § 11.1) — ✅ réalisé, puis **sous-étape validée par le porteur le 2026-11-24**
 - **Date :** 2026-11-24
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.3 **uniquement** : se connecter, garder sa session (renouvellement), se

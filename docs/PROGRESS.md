@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-24 (sous-étape 1.3 réalisée)
+**Dernière mise à jour :** 2026-11-24 (sous-étape 1.3 validée)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -50,7 +50,7 @@
   - Verrou git périmé `.git/stale-maintenance-lock-from-claude-chat` supprimé.
 - **Plan de la sous-étape 1.3 validé** le 2026-11-24 (7 recommandations + compléments du porteur : audience `eudoria-core`,
   `MapInboundClaims = false`, `RequireSignedTokens` / `RequireExpirationTime` explicites, version stricte de la rotation).
-- **Sous-étape 1.3 réalisée le 2026-11-24 — en attente de validation par le porteur** (`docs/plans/etape-01-3.md`, § 14) :
+- **Sous-étape 1.3 réalisée et ✅ validée par le porteur le 2026-11-24** (`docs/plans/etape-01-3.md`, § 14) :
   - contrat core-v1 **1.2.0** : `POST /v1/auth/login`, `/v1/auth/refresh`, `/v1/auth/logout`, `GET /v1/me` ;
   - jeton d'accès **JWT ES256** 15 min (audience `eudoria-core`) ; jeton de renouvellement aléatoire, **empreinte SHA-256**
     en base (`identity.refresh_tokens`, migration `CreateRefreshTokens`), rotation à chaque usage, 7 jours / session 30 jours,
@@ -123,8 +123,6 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. **Le porteur valide la sous-étape 1.3** (il peut rejouer le scénario de `docs/SETUP.md` § « Lancer le noyau en local » :
-   connexion, `/me`, renouvellement, déconnexion).
-2. Ensuite seulement, sur sa demande : proposer le plan de la **sous-étape 1.4** (limitation des tentatives, validations,
-   changement de mot de passe + « déconnecter tous mes appareils », reports de la 1.2), l'écrire dans
-   `docs/plans/etape-01-4.md` et attendre le « OK ». **Ne pas commencer la 1.4 sans son accord.**
+1. Sur demande du porteur seulement : proposer le plan de la **sous-étape 1.4** (limitation des tentatives de connexion,
+   validations, changement de mot de passe + « déconnecter tous mes appareils », reports de la 1.2 listés dans la ROADMAP),
+   l'écrire dans `docs/plans/etape-01-4.md` et attendre le « OK ». **Ne pas commencer la 1.4 sans son accord.**
