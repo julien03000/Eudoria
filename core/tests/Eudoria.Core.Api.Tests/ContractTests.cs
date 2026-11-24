@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
 using Eudoria.Core.Api.Tests.Infrastructure;
@@ -19,8 +20,8 @@ public sealed class ContractTests(PostgresFixture database)
 {
     private static readonly string ContractPath = Path.Combine(AppContext.BaseDirectory, "Contracts", "core-v1.yaml");
 
-    // A pseudo registered before the "409" scenario (Setup), so that the scenario finds it taken.
-    private static readonly string TakenPseudo = RegistrationTests.UniquePseudo();
+    // A well-formed refresh token that was never issued.
+    private const string UnknownRefreshToken = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
     /// <summary>One scenario per documented (method, path, status). Adding a response to the
     /// contract without a scenario here makes <see cref="EveryDocumentedResponse_HasAScenario"/> fail.</summary>
@@ -30,12 +31,41 @@ public sealed class ContractTests(PostgresFixture database)
         new("GET", "/health/ready", HttpStatusCode.OK, DatabaseReachable: true),
         new("GET", "/health/ready", HttpStatusCode.ServiceUnavailable, DatabaseReachable: false),
         new("POST", "/accounts", HttpStatusCode.Accepted, DatabaseReachable: true,
-            Body: () => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), RegistrationTests.UniquePseudo(), "a-long-enough-passphrase")),
+            Json(() => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), RegistrationTests.UniquePseudo(), "a-long-enough-passphrase"))),
         new("POST", "/accounts", HttpStatusCode.BadRequest, DatabaseReachable: true,
-            Body: () => RegistrationTests.RegistrationJson("not-an-email", "x", "short")),
-        new("POST", "/accounts", HttpStatusCode.Conflict, DatabaseReachable: true,
-            Body: () => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), TakenPseudo, "a-long-enough-passphrase"),
-            Setup: () => RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), TakenPseudo, "a-long-enough-passphrase")),
+            Json(() => RegistrationTests.RegistrationJson("not-an-email", "x", "short"))),
+        new("POST", "/accounts", HttpStatusCode.Conflict, DatabaseReachable: true, async client =>
+        {
+            (_, string takenPseudo) = await SessionTests.RegisterAsync(client);
+            return new(RegistrationTests.RegistrationJson(RegistrationTests.UniqueEmail(), takenPseudo, "a-long-enough-passphrase"));
+        }),
+        new("POST", "/auth/login", HttpStatusCode.OK, DatabaseReachable: true, async client =>
+        {
+            (string email, _) = await SessionTests.RegisterAsync(client);
+            return new(SessionTests.LoginJson(email, SessionTests.Password));
+        }),
+        new("POST", "/auth/login", HttpStatusCode.BadRequest, DatabaseReachable: true, Json(() => "not json")),
+        new("POST", "/auth/login", HttpStatusCode.Unauthorized, DatabaseReachable: true,
+            Json(() => SessionTests.LoginJson(RegistrationTests.UniqueEmail(), SessionTests.Password))),
+        new("POST", "/auth/refresh", HttpStatusCode.OK, DatabaseReachable: true, async client =>
+        {
+            (string email, _) = await SessionTests.RegisterAsync(client);
+            JsonNode tokens = await SessionTests.LoginJsonAsync(client, email);
+            return new(SessionTests.RefreshTokenJson(tokens["refreshToken"]!.GetValue<string>()));
+        }),
+        new("POST", "/auth/refresh", HttpStatusCode.BadRequest, DatabaseReachable: true, Json(() => "not json")),
+        new("POST", "/auth/refresh", HttpStatusCode.Unauthorized, DatabaseReachable: true,
+            Json(() => SessionTests.RefreshTokenJson(UnknownRefreshToken))),
+        new("POST", "/auth/logout", HttpStatusCode.NoContent, DatabaseReachable: true,
+            Json(() => SessionTests.RefreshTokenJson(UnknownRefreshToken))),
+        new("POST", "/auth/logout", HttpStatusCode.BadRequest, DatabaseReachable: true, Json(() => "not json")),
+        new("GET", "/me", HttpStatusCode.OK, DatabaseReachable: true, async client =>
+        {
+            (string email, _) = await SessionTests.RegisterAsync(client);
+            JsonNode tokens = await SessionTests.LoginJsonAsync(client, email);
+            return new(Body: null, BearerToken: tokens["accessToken"]!.GetValue<string>());
+        }),
+        new("GET", "/me", HttpStatusCode.Unauthorized, DatabaseReachable: true),
     ];
 
     [Fact]
@@ -94,20 +124,31 @@ public sealed class ContractTests(PostgresFixture database)
             IOpenApiResponse documented = EnumerateOperations(contract)
                 .Single(operation => operation.Method == scenario.Method && operation.Path == scenario.Path)
                 .Responses[((int)scenario.Status).ToString(System.Globalization.CultureInfo.InvariantCulture)];
-            (string mediaType, IOpenApiMediaType content) = Assert.Single(documented.Content!);
-            IOpenApiSchema schema = content.Schema!;
 
             await using CoreApiFactory factory = new(scenario.DatabaseReachable ? database.ConnectionString : CoreApiFactory.UnreachableDatabase);
             using HttpClient client = factory.CreateClient();
-            if (scenario.Setup is not null)
-            {
-                using HttpResponseMessage setup = await SendAsync(client, scenario.Method, basePath + scenario.Path, scenario.Setup());
-                Assert.True(setup.IsSuccessStatusCode, $"{scenario}: setup failed with {setup.StatusCode}.");
-            }
+            ScenarioRequest request = scenario.Prepare is null ? new(Body: null) : await scenario.Prepare(client);
 
-            using HttpResponseMessage response = await SendAsync(client, scenario.Method, basePath + scenario.Path, scenario.Body?.Invoke());
+            using HttpResponseMessage response = await SendAsync(client, scenario.Method, basePath + scenario.Path, request);
 
             Assert.Equal(scenario.Status, response.StatusCode);
+            foreach ((string name, IOpenApiHeader header) in documented.Headers ?? new Dictionary<string, IOpenApiHeader>())
+            {
+                Assert.True(response.Headers.TryGetValues(name, out IEnumerable<string>? values), $"{scenario}: missing header {name}.");
+                if (header.Schema?.Enum is { Count: > 0 } allowed)
+                {
+                    Assert.Contains(string.Join(", ", values), allowed.Select(value => value!.GetValue<string>()));
+                }
+            }
+
+            if (documented.Content is null || documented.Content.Count == 0)
+            {
+                Assert.Empty(await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+                continue;
+            }
+
+            (string mediaType, IOpenApiMediaType content) = Assert.Single(documented.Content);
+            IOpenApiSchema schema = content.Schema!;
             Assert.Equal(mediaType, response.Content.Headers.ContentType?.MediaType);
             JsonNode? body = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
             IReadOnlyList<string> errors = SchemaValidator.Validate(body, schema);
@@ -148,12 +189,17 @@ public sealed class ContractTests(PostgresFixture database)
         Assert.Equal(documentedCodes.Order(StringComparer.Ordinal), codeConstants.Order(StringComparer.Ordinal));
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string method, string path, string? jsonBody)
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string method, string path, ScenarioRequest scenarioRequest)
     {
         using HttpRequestMessage request = new(new HttpMethod(method), new Uri(path, UriKind.Relative));
-        if (jsonBody is not null)
+        if (scenarioRequest.Body is not null)
         {
-            request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            request.Content = new StringContent(scenarioRequest.Body, Encoding.UTF8, "application/json");
+        }
+
+        if (scenarioRequest.BearerToken is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", scenarioRequest.BearerToken);
         }
 
         return await client.SendAsync(request, TestContext.Current.CancellationToken);
@@ -182,9 +228,17 @@ public sealed class ContractTests(PostgresFixture database)
         from operation in path.Value.Operations ?? []
         select (operation.Key.Method.ToUpperInvariant(), path.Key, operation.Value.Responses ?? []);
 
-    /// <param name="Body">JSON request body, built when the scenario runs (unique values).</param>
-    /// <param name="Setup">Optional JSON body sent once to the same route before the scenario.</param>
+    /// <summary>A scenario whose request is only a JSON body, built when the scenario runs (unique values).</summary>
+    private static Func<HttpClient, Task<ScenarioRequest>> Json(Func<string> body) =>
+        _ => Task.FromResult(new ScenarioRequest(body()));
+
+    /// <param name="Prepare">Builds the request when the scenario runs; may first call the core
+    /// (register, log in...). Null: no body and no token.</param>
     private sealed record ContractScenario(
         string Method, string Path, HttpStatusCode Status, bool DatabaseReachable,
-        Func<string>? Body = null, Func<string>? Setup = null);
+        Func<HttpClient, Task<ScenarioRequest>>? Prepare = null);
+
+    /// <param name="Body">JSON request body, or null.</param>
+    /// <param name="BearerToken">Access token sent in the Authorization header, or null.</param>
+    private sealed record ScenarioRequest(string? Body, string? BearerToken = null);
 }

@@ -54,6 +54,18 @@ public sealed class Argon2idPasswordHasherTests
         Assert.False(_hasher.Verify("correct horse battery staple", hash));
 
     [Fact]
+    public void NeedsRehash_IsTrue_OnlyForAValidHashMadeWithAnotherCost()
+    {
+        Argon2idPasswordHasher current = new(new Argon2idOptions(MemoryKib: 2048, Passes: 2));
+
+        Assert.False(current.NeedsRehash(current.Hash("correct horse battery staple")));
+        Assert.True(current.NeedsRehash(_hasher.Hash("correct horse battery staple"))); // older, cheaper cost
+        Assert.True(current.NeedsRehash(new Argon2idPasswordHasher(new Argon2idOptions(2048, 3)).Hash("x"))); // other passes
+        Assert.False(current.NeedsRehash("plain-text-password")); // not a hash: nothing to upgrade
+        Assert.False(current.NeedsRehash(""));
+    }
+
+    [Fact]
     public void ProductionCost_IsTheChosenSetting_AndReallyCostsTime()
     {
         Argon2idPasswordHasher production = new(Argon2idOptions.Default);
