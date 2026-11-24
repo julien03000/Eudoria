@@ -64,6 +64,6 @@ Ces règles sont sans effet tant qu'aucun fichier Unreal n'existe dans le dépô
 d'oublier une protection au moment où le projet Unreal sera créé.
 
 ## Points ouverts (à décider avant le premier envoi d'assets)
-- **Hébergeur distant** du dépôt : GitHub (quota LFS gratuit faible, verrouillage supporté à confirmer), autre hébergeur, ou serveur auto-hébergé. Traité par l'ADR-0006.
+- **Hébergeur distant** du dépôt : GitHub retenu (ADR-0006) ; verrouillage LFS testé avec succès le 2026-11-24.
 - **Activation de Git LFS dans le dépôt** (`git lfs install`, simple configuration) au moment de créer le projet Unreal (étape 1).
 - **Intégration du verrouillage dans l'éditeur Unreal** : plugin Git avec support LFS à choisir et tester à l'étape 1.

@@ -80,8 +80,8 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
 - **Réseau** : réplication native Unreal + **serveurs dédiés** ; un monde = un plugin **Game Feature** qui ne
   dépend que du plugin socle `EudoriaCore` ; moteur compilé depuis les sources à partir de l'étape 3 — ADR-0004.
 - **Fichiers binaires** : **Git LFS** avec verrouillage (`.uasset`, `.umap` verrouillables) — ADR-0005.
-- **Hébergement du dépôt distant** : **GitHub, dépôt privé** `julien03000/eudoria`
-  (https://github.com/julien03000/eudoria), remote `origin`, en HTTPS — ADR-0006.
+- **Hébergement du dépôt distant** : **GitHub, dépôt privé** `julien03000/Eudoria`
+  (https://github.com/julien03000/Eudoria), remote `origin`, en HTTPS — ADR-0006.
 
 ## Environnement
 - **Règle d'installation : tout sur E:.** Le disque C: n'a qu'environ 50 Go libres ; seuls les composants

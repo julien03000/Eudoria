@@ -21,15 +21,16 @@
 - Unreal Engine **5.8.4** installé par le porteur dans `E:\Epic Games\UE_5.8` — détecté et vérifié (29,8 Go).
 - **Nettoyage** : bibliothèque Fab supprimée (`%LOCALAPPDATA%\Temp\FabLibrary`, 6,1 Go) à la demande du porteur → C: passé de 50 à 56 Go libres.
 
-- **ADR-0006 accepté** : GitHub, dépôt privé `julien03000/eudoria` ; remote `origin` configuré ; Git LFS activé dans le dépôt (`git lfs install --local`).
+- **ADR-0006 accepté** : GitHub, dépôt privé `julien03000/Eudoria` ; remote `origin` configuré ; Git LFS activé dans le dépôt (`git lfs install --local`).
 - `CLAUDE.md` : règles d'authentification GitHub (jamais de jeton dans un fichier) et **push sur GitHub en fin de session**.
 - **Visual Studio 2026 Community 18.12.1** installé sur E: (composants : `tools/vs/eudoria.vsconfig`) — C: 7,5 Go, E: 8,2 Go.
 - **Docker Desktop** installé sur E: (programme + données WSL) — C: 0,6 Go, E: 3,2 Go ; mémoire WSL limitée à 4 Go (`.wslconfig`).
 - Vérifié : VS détecté à `E:\Dev\VisualStudio\2026\Community`, MSVC 14.52, Windows SDK 10.0.26100, .NET SDK 11.0.100 + runtime .NET 10.0.15.
 
+- **`main` envoyé sur GitHub** (`https://github.com/julien03000/Eudoria`, suivi de `origin/main`). Authentification par Git Credential Manager, faite par le porteur dans le navigateur ; aucun jeton dans un fichier.
+- **Verrouillage LFS testé avec succès sur GitHub** : fichier `.uasset` en lecture seule tant qu'il n'est pas verrouillé, `git lfs lock` / `locks` / `locks --verify` / `unlock` fonctionnels. Fichier de test supprimé ensuite (il reste dans l'historique, 2 Ko en LFS).
+
 ## 🟡 En cours
-- **Envoi de `main` sur GitHub bloqué** : connexion réussie, mais GitHub répond « Repository not found » (compte connecté différent de `julien03000`, adresse différente, ou accès refusé à Git Credential Manager). À vérifier par le porteur.
-- Test du verrouillage LFS (après l'envoi).
 - Redémarrage du PC demandé par Visual Studio, puis premier lancement de Docker Desktop (acceptation de la licence par le porteur) et test `docker run hello-world`.
 
 ## 🧹 Traces de l'ancienne installation d'Unreal (décisions du porteur, 2026-11-24)
@@ -45,7 +46,8 @@
 | Réglages éditeur 5.8 | `%LOCALAPPDATA%\UnrealEngine\5.8` | 0,12 Go | À garder (installation actuelle) |
 
 ## ⚠️ Problèmes connus / points d'attention
-- **Dépôt uniquement sur ce PC** : aucune sauvegarde hors site tant que l'envoi sur GitHub n'a pas réussi.
+- **Sauvegarde** : le dépôt est sur GitHub ; la seconde sauvegarde indépendante recommandée par l'ADR-0006 (disque externe) n'est pas encore en place.
+- Quota LFS gratuit de GitHub : 10 Gio de stockage et 10 Gio de téléchargement par mois — à surveiller dès l'arrivée des premiers assets.
 - **.NET** : Visual Studio 18.12 a installé le SDK **11** (et non 10). Le runtime .NET 10 LTS est présent et le SDK 11 compile pour net10.0 : conforme à l'ADR-0001. Au début de l'étape 1, décider s'il faut épingler un SDK 10 (`global.json`) ou utiliser le SDK 11.
 - **Mémoire vive : 16 Go** (32 recommandés). Passage à 32 Go prévu avant l'étape 3. En attendant : limiter `MaxParallelActions` d'Unreal Build Tool (voir `CLAUDE.md`), et vérifier que la limite s'applique bien à l'UBA.
 - **Disque C:** ~48 Go libres après Visual Studio et Docker ; il descend temporairement pendant les installations.
@@ -54,8 +56,7 @@
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
-1. Corriger l'accès GitHub, envoyer `main`, tester le verrouillage LFS sur un fichier de test puis le supprimer.
-2. Redémarrer le PC ; lancer Docker Desktop (licence), tester `docker run hello-world`.
-3. Clôturer la Phase 0, créer la branche `etape-01-identite` et proposer le plan de la sous-étape 1.1
+1. Redémarrer le PC ; lancer Docker Desktop (licence), tester `docker run hello-world`.
+2. Clôturer la Phase 0, créer la branche `etape-01-identite` et proposer le plan de la sous-étape 1.1
    (squelette du noyau + environnement local + route « santé »).
-4. Au début de l'étape 1 : rediriger le DDC/Zen d'Unreal vers E:, **puis** supprimer les anciens caches DDC et Zen ; créer `BuildConfiguration.xml` avec la limite de compilations parallèles.
+3. Au début de l'étape 1 : rediriger le DDC/Zen d'Unreal vers E:, **puis** supprimer les anciens caches DDC et Zen ; créer `BuildConfiguration.xml` avec la limite de compilations parallèles.
