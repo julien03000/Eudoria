@@ -34,8 +34,13 @@ Légende de fiabilité des tailles : **mesuré** (sur ce PC) · **officiel** (do
 | Git 2.56.1 (avec Git LFS 3.8.1) | Versionnement, fichiers binaires (ADR-0005) | `C:\Program Files\Git` | 0,4 Go (mesuré) |
 | Epic Games Launcher | Installer et mettre à jour Unreal | `C:\Program Files\Epic Games\Launcher` | 0,8 Go (mesuré) |
 | Unreal Engine 5.8.4 | Moteur client (ADR-0003) | `E:\Epic Games\UE_5.8` | 29,8 Go (mesuré) |
+| Visual Studio 2026 Community 18.12.1 (installé le 2026-11-24) | C++ Unreal, .NET | `E:\Dev\VisualStudio\...` (+ SDK Windows et .NET sur C:) | **C: 7,5 Go · E: 8,2 Go** (mesuré) |
+| .NET SDK 11.0.100 + runtimes 10.0.15 / 11.0.0 (via VS) | Noyau (cible net10.0) | `C:\Program Files\dotnet` | inclus ci-dessus |
+| Docker Desktop (installé le 2026-11-24) | PostgreSQL en local | `E:\Dev\Docker\Program`, données `E:\Dev\Docker\Data` | **C: 0,6 Go · E: 3,2 Go** (mesuré, avant toute image) |
 
-### À installer pour l'étape 1 (après validation des ADR)
+Bilan mesuré des deux installations : **C: 8,1 Go** (estimation : 9 à 13), **E: 11,4 Go**. C: : 47,9 Go libres après installation.
+
+### Prévu pour l'étape 1 (plan initial, conservé pour référence)
 
 | Outil | Rôle | Taille | Sur C: (forcé) | Sur E: |
 |---|---|---|---|---|

@@ -91,7 +91,15 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
 - **Unreal Engine 5.8.4** (version du lanceur Epic) : `E:\Epic Games\UE_5.8`
   - Éditeur : `E:\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe`
   - Python de l'éditeur : `E:\Epic Games\UE_5.8\Engine\Binaries\ThirdParty\Python3\Win64\python.exe`
-- **Git 2.56.1** (+ Git LFS 3.8.1) : `C:\Program Files\Git\cmd\git.exe` (peut être absent du PATH des sessions déjà ouvertes).
+- **Git 2.56.1** (+ Git LFS 3.8.1, Git Credential Manager 2.9.1) : `C:\Program Files\Git\cmd\git.exe` (peut être absent du PATH des sessions déjà ouvertes).
+  La connexion à GitHub ne peut pas s'afficher depuis le terminal de Claude (non interactif) : la lancer dans un onglet du panneau Terminal.
+- **Visual Studio 2026 Community 18.12.1** : `E:\Dev\VisualStudio\2026\Community` (composants partagés `E:\Dev\VisualStudio\Shared`,
+  cache `E:\Dev\VisualStudio\Cache`) ; composants listés dans `tools/vs/eudoria.vsconfig`. MSVC 14.52, Windows SDK 10.0.26100 (sur C:).
+- **.NET** (installé par VS, sur C: `C:\Program Files\dotnet`) : SDK **11.0.100** ; runtimes **10.0.15** et 11.0.0 (ASP.NET Core inclus).
+  Le noyau cible **net10.0 (LTS)** comme décidé (ADR-0001) ; le SDK 11 sait compiler pour net10.0.
+- **Docker Desktop** : programme `E:\Dev\Docker\Program`, données WSL `E:\Dev\Docker\Data`, moteur WSL 2.
+  Mémoire de WSL limitée à 4 Go par `%USERPROFILE%\.wslconfig` (s'applique aussi à la distribution Ubuntu existante) ; à relever à 32 Go.
+- Installateurs officiels conservés dans `E:\Dev\_installers` (supprimables).
 - Poste : Windows 11, Ryzen 9 3900X (12 cœurs / 24 threads), **16 Go de RAM** (Epic en recommande 32 ;
   passage à 32 Go prévu, prérequis de l'étape 3), Radeon RX 9060 XT.
 - **Tant que le poste a 16 Go de RAM : limiter les compilations parallèles d'Unreal Build Tool** pour éviter
