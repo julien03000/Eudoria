@@ -7,6 +7,7 @@ public class EudoriaCore : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "DeveloperSettings" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "HTTP", "Json" });
 	}
 }
