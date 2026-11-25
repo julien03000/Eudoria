@@ -9,7 +9,7 @@
 
 namespace EudoriaSessionTests
 {
-	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
+	constexpr EAutomationTestFlags SessionTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 
 	const TCHAR* Password = TEXT("S3cret-passphrase-for-tests");
 	const TCHAR* Access1 = TEXT("access.one.token");
@@ -126,7 +126,7 @@ namespace EudoriaSessionTests
 
 using namespace EudoriaSessionTests;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionLoginTest, "Eudoria.Core.Session.LoginAndProfile", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionLoginTest, "Eudoria.Core.Session.LoginAndProfile", SessionTestFlags)
 bool FEudoriaSessionLoginTest::RunTest(const FString&)
 {
 	const TSharedRef<FFakeTransport> Transport = MakeShared<FFakeTransport>();
@@ -143,7 +143,7 @@ bool FEudoriaSessionLoginTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionSingleRenewalTest, "Eudoria.Core.Session.TwoSimultaneous401sRenewOnce", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionSingleRenewalTest, "Eudoria.Core.Session.TwoSimultaneous401sRenewOnce", SessionTestFlags)
 bool FEudoriaSessionSingleRenewalTest::RunTest(const FString&)
 {
 	const TSharedRef<FFakeTransport> Transport = MakeShared<FFakeTransport>();
@@ -174,7 +174,7 @@ bool FEudoriaSessionSingleRenewalTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionRenewalFailsTest, "Eudoria.Core.Session.TwoSimultaneous401sRenewalFails", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionRenewalFailsTest, "Eudoria.Core.Session.TwoSimultaneous401sRenewalFails", SessionTestFlags)
 bool FEudoriaSessionRenewalFailsTest::RunTest(const FString&)
 {
 	const TSharedRef<FFakeTransport> Transport = MakeShared<FFakeTransport>();
@@ -196,7 +196,7 @@ bool FEudoriaSessionRenewalFailsTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionStaleTokenTest, "Eudoria.Core.Session.LateStale401ReplaysWithoutRenewal", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionStaleTokenTest, "Eudoria.Core.Session.LateStale401ReplaysWithoutRenewal", SessionTestFlags)
 bool FEudoriaSessionStaleTokenTest::RunTest(const FString&)
 {
 	const TSharedRef<FFakeTransport> Transport = MakeShared<FFakeTransport>();
@@ -219,7 +219,7 @@ bool FEudoriaSessionStaleTokenTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionNoLoopTest, "Eudoria.Core.Session.ReplayRefusedAgainEndsSession", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionNoLoopTest, "Eudoria.Core.Session.ReplayRefusedAgainEndsSession", SessionTestFlags)
 bool FEudoriaSessionNoLoopTest::RunTest(const FString&)
 {
 	const TSharedRef<FFakeTransport> Transport = MakeShared<FFakeTransport>();
@@ -239,7 +239,7 @@ bool FEudoriaSessionNoLoopTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionLogoutTest, "Eudoria.Core.Session.LogoutForgetsTokens", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionLogoutTest, "Eudoria.Core.Session.LogoutForgetsTokens", SessionTestFlags)
 bool FEudoriaSessionLogoutTest::RunTest(const FString&)
 {
 	const TSharedRef<FFakeTransport> Transport = MakeShared<FFakeTransport>();
@@ -259,7 +259,7 @@ bool FEudoriaSessionLogoutTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionLogoutDuringRenewalTest, "Eudoria.Core.Session.LogoutDuringRenewal", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionLogoutDuringRenewalTest, "Eudoria.Core.Session.LogoutDuringRenewal", SessionTestFlags)
 bool FEudoriaSessionLogoutDuringRenewalTest::RunTest(const FString&)
 {
 	const TSharedRef<FFakeTransport> Transport = MakeShared<FFakeTransport>();
@@ -278,7 +278,7 @@ bool FEudoriaSessionLogoutDuringRenewalTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionNoSecretsInLogTest, "Eudoria.Core.Session.NoSecretInLogs", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaSessionNoSecretsInLogTest, "Eudoria.Core.Session.NoSecretInLogs", SessionTestFlags)
 bool FEudoriaSessionNoSecretsInLogTest::RunTest(const FString&)
 {
 	FLogCapture Capture;

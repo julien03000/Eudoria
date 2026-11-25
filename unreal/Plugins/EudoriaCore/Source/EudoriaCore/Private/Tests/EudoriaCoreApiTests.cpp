@@ -11,7 +11,7 @@
 
 namespace EudoriaCoreApiTests
 {
-	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
+	constexpr EAutomationTestFlags ApiTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 
 	const TCHAR* ValidTokenPair = TEXT(R"({"accessToken":"aaa.bbb.ccc","tokenType":"Bearer","expiresIn":900,"refreshToken":"r-123","refreshExpiresIn":604800})");
 
@@ -23,7 +23,7 @@ namespace EudoriaCoreApiTests
 
 using namespace EudoriaCoreApiTests;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiSecureUrlTest, "Eudoria.Core.Api.SecureBaseUrl", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiSecureUrlTest, "Eudoria.Core.Api.SecureBaseUrl", ApiTestFlags)
 bool FEudoriaApiSecureUrlTest::RunTest(const FString&)
 {
 	TestTrue(TEXT("https with port and path"), EudoriaCoreApi::IsSecureBaseUrl(TEXT("https://localhost:5443/v1")));
@@ -36,7 +36,7 @@ bool FEudoriaApiSecureUrlTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiConfiguredUrlTest, "Eudoria.Core.Api.ConfiguredUrlIsSecure", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiConfiguredUrlTest, "Eudoria.Core.Api.ConfiguredUrlIsSecure", ApiTestFlags)
 bool FEudoriaApiConfiguredUrlTest::RunTest(const FString&)
 {
 	// Reads the real DefaultGame.ini value: an unquoted "https://..." is cut at "//" by the ini parser.
@@ -46,7 +46,7 @@ bool FEudoriaApiConfiguredUrlTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiTransportRefusesHttpTest, "Eudoria.Core.Api.TransportRefusesHttp", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiTransportRefusesHttpTest, "Eudoria.Core.Api.TransportRefusesHttp", ApiTestFlags)
 bool FEudoriaApiTransportRefusesHttpTest::RunTest(const FString&)
 {
 	FEudoriaHttpModuleTransport Transport(TEXT("http://localhost:5080/v1"), 10.0f);
@@ -67,7 +67,7 @@ bool FEudoriaApiTransportRefusesHttpTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiRegistrationTest, "Eudoria.Core.Api.Registration", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiRegistrationTest, "Eudoria.Core.Api.Registration", ApiTestFlags)
 bool FEudoriaApiRegistrationTest::RunTest(const FString&)
 {
 	TestFalse(TEXT("202 = success"), EudoriaCoreApi::ParseRegistration(FEudoriaHttpResponse::Make(202, TEXT(R"({"status":"accepted"})"))).IsSet());
@@ -94,7 +94,7 @@ bool FEudoriaApiRegistrationTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiLimitsTest, "Eudoria.Core.Api.Limits", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiLimitsTest, "Eudoria.Core.Api.Limits", ApiTestFlags)
 bool FEudoriaApiLimitsTest::RunTest(const FString&)
 {
 	const FEudoriaApiError TooMany = EudoriaCoreApi::ParseError(FEudoriaHttpResponse::Make(429,
@@ -120,7 +120,7 @@ bool FEudoriaApiLimitsTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiBrokenResponsesTest, "Eudoria.Core.Api.BrokenResponses", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiBrokenResponsesTest, "Eudoria.Core.Api.BrokenResponses", ApiTestFlags)
 bool FEudoriaApiBrokenResponsesTest::RunTest(const FString&)
 {
 	const FEudoriaApiError BadJson = EudoriaCoreApi::ParseError(FEudoriaHttpResponse::Make(400, TEXT("{not json")));
@@ -144,7 +144,7 @@ bool FEudoriaApiBrokenResponsesTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiTokenPairTest, "Eudoria.Core.Api.TokenPair", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiTokenPairTest, "Eudoria.Core.Api.TokenPair", ApiTestFlags)
 bool FEudoriaApiTokenPairTest::RunTest(const FString&)
 {
 	const auto Valid = EudoriaCoreApi::ParseTokenPair(FEudoriaHttpResponse::Make(200, ValidTokenPair));
@@ -173,7 +173,7 @@ bool FEudoriaApiTokenPairTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiProfileTest, "Eudoria.Core.Api.Profile", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiProfileTest, "Eudoria.Core.Api.Profile", ApiTestFlags)
 bool FEudoriaApiProfileTest::RunTest(const FString&)
 {
 	const auto Valid = EudoriaCoreApi::ParseProfile(FEudoriaHttpResponse::Make(200,
@@ -191,7 +191,7 @@ bool FEudoriaApiProfileTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiBodiesTest, "Eudoria.Core.Api.RequestBodies", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaApiBodiesTest, "Eudoria.Core.Api.RequestBodies", ApiTestFlags)
 bool FEudoriaApiBodiesTest::RunTest(const FString&)
 {
 	const FString Tricky = TEXT("quote\" back\\slash é\nline");

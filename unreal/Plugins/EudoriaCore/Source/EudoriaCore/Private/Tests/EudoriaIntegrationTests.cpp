@@ -13,7 +13,7 @@
 
 namespace EudoriaIntegrationTests
 {
-	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
+	constexpr EAutomationTestFlags IntegrationTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 
 	/** Runs the HTTP module until Done() is true or the timeout expires (the test runs on the game thread). */
 	bool WaitFor(TFunctionRef<bool()> Done, double TimeoutSeconds = 15.0)
@@ -69,7 +69,7 @@ namespace EudoriaIntegrationTests
 
 using namespace EudoriaIntegrationTests;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaIntegrationFullFlowTest, "Eudoria.Integration.RegisterLoginProfileLogout", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaIntegrationFullFlowTest, "Eudoria.Integration.RegisterLoginProfileLogout", IntegrationTestFlags)
 bool FEudoriaIntegrationFullFlowTest::RunTest(const FString&)
 {
 	const TSharedRef<FEudoriaHttpModuleTransport> Transport = MakeTransport();
@@ -114,7 +114,7 @@ bool FEudoriaIntegrationFullFlowTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaIntegrationRefreshAfterLogoutTest, "Eudoria.Integration.RefreshRefusedAfterLogout", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaIntegrationRefreshAfterLogoutTest, "Eudoria.Integration.RefreshRefusedAfterLogout", IntegrationTestFlags)
 bool FEudoriaIntegrationRefreshAfterLogoutTest::RunTest(const FString&)
 {
 	const TSharedRef<FEudoriaHttpModuleTransport> Transport = MakeTransport();
@@ -145,7 +145,7 @@ bool FEudoriaIntegrationRefreshAfterLogoutTest::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaIntegrationErrorsTest, "Eudoria.Integration.PseudoTakenAndWrongPassword", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaIntegrationErrorsTest, "Eudoria.Integration.PseudoTakenAndWrongPassword", IntegrationTestFlags)
 bool FEudoriaIntegrationErrorsTest::RunTest(const FString&)
 {
 	const TSharedRef<FEudoriaHttpModuleTransport> Transport = MakeTransport();
