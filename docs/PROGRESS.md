@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-25 (sous-étape 1.5 validée ; prochaine : plan de la 1.6)
+**Dernière mise à jour :** 2026-11-26 (plan 1.6 validé, réalisation à lancer)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,6 +35,13 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
+- **Plan de la sous-étape 1.6 ✅ validé par le porteur le 2026-11-26** (`docs/plans/etape-01-6.md`) — **réalisation à
+  lancer, aucun code écrit**. Ticket d'entrée des mondes : JWT ES256 `typ: eudoria-entry+jwt`, 60 s (tolérance 15 s côté
+  monde), audience `eudoria-world:<id>`, usage unique (`jti` retenus par le monde), signé par une **clé distincte** publiée
+  en JWKS (`GET /v1/entry-tickets/keys`, `kid` RFC 7638) ; jeton d'accès retypé `eudoria-access+jwt` (seul type accepté
+  par le noyau) ; premier monde `sandbox` (liste fermée dans `appsettings.json`) ; ADR-0007 à rédiger (« Proposé »).
+  Décisions du § 13 : 1 = A (partie A noyau + vérificateur tiers .NET, **contrôle du porteur**, puis partie B C++),
+  2 = clé distincte, 3 = oui, 4 = 60 s / 15 s, 5 = ADR-0007, 6 = `sandbox`.
 - **Sous-étape 1.5 réalisée et ✅ validée par le porteur le 2026-11-25** (T5), après son test réel **T4 réussi** :
   création de compte, connexion, « Bienvenue », déconnexion, mauvais mot de passe refusé. Journaux de T4 relus : aucune
   erreur, aucun jeton ni mot de passe (seulement des noms de colonnes SQL). Remarque du porteur : contraste insuffisant
@@ -217,7 +224,7 @@
   échoue sur le message normal de Docker « Container … Running » (PowerShell 5.1 le prend pour une erreur). Sans effet
   quand le porteur lance le script lui-même. Correction possible (petit changement) : à proposer au porteur.
 
-1. **Claude : rédiger le plan de la sous-étape 1.6** — vérification d'un jeton par un service tiers : le noyau délivre
-   un **ticket d'entrée** de courte durée, avec une audience propre à chaque monde (le jeton d'accès `eudoria-core`
-   n'est jamais transmis aux mondes ; décision du 2026-11-24, ROADMAP § découpage). Créer `docs/plans/etape-01-6.md`,
-   le présenter au porteur et **attendre son « OK » avant tout code**.
+1. **Claude : réaliser la partie A de la sous-étape 1.6** (`docs/plans/etape-01-6.md`, commits 1 à 9 du § 17) :
+   commencer par l'**ADR-0007** (« Proposé ») puis le contrat core-v1 **1.4.0** ; noyau, vérificateur tiers .NET, jeux
+   d'essai, lancement réel, documentation. **S'arrêter après la partie A** pour le contrôle du porteur (validation de
+   l'ADR-0007 comprise) avant la partie B (C++).
