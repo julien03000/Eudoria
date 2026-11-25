@@ -307,3 +307,34 @@ Python de l'éditeur, utilitaires de script de l'éditeur) et l'outil `dotnet de
 6. `test(unreal): add automation tests and the Blueprint-logic check`
 7. `chore(tools): add build, run and test scripts for the Unreal client`
 8. `docs(architecture): describe the Unreal project; update setup, progress and roadmap`
+
+---
+
+## 14. Écarts par rapport au plan (réalisation, 2026-11-25)
+
+1. **Vérification « aucune logique Blueprint » en C++ au lieu de Python** (décision du porteur, 2026-11-25).
+   - *Constat :* en Python (UE 5.8), les nœuds d'un graphe Blueprint sont **protégés** (`EdGraph.nodes` illisible) ; les
+     fonctions disponibles (`list_functions`, `list_events`) comptent comme « implémentés » les nœuds fantômes qu'Unreal
+     place d'office dans tout Blueprint neuf (BeginPlay, Tick, script de construction). Un script Python ne pouvait donc
+     pas distinguer un Blueprint vide d'un Blueprint avec de la logique (essai fait sur un Blueprint jetable).
+   - *Réalisé :* nouveau module **éditeur seul** `EudoriaEditor` (`unreal/Source/EudoriaEditor`, jamais livré dans le client
+     ni les serveurs) : règle `EudoriaBlueprintRules::FindLogic` (tout nœud est de la logique sauf fantômes, commentaires,
+     entrées/sorties de fonction et de macro) et deux tests lancés par `test-unreal.ps1` :
+     `Eudoria.Editor.NoBlueprintLogic` (parcourt tous les Blueprints de `/Game` et des plugins du projet) et
+     `Eudoria.Editor.NoBlueprintLogicDetectsFaultyBlueprint` (Blueprint temporaire dans un dossier jetable
+     `/Game/__EudoriaTmp_<guid>`, jamais enregistré : neuf → 0 nœud de logique ; + un nœud « Print String » → détecté par
+     la règle **et** par le parcours du projet ; puis supprimé du registre et de la mémoire, aucun fichier sur disque).
+   - *Test de mutation :* règle neutralisée → le test de preuve échoue (« 0 au lieu de 1 »). Code restauré.
+   - Le script `unreal/Scripts/check_no_blueprint_logic.py` prévu au § 3 n'existe donc pas.
+2. **Plugin `AndroidFileServer` désactivé** dans `Eudoria.uproject` (décision du porteur) : l'éditeur écrivait à chaque
+   ouverture un `SecurityToken` aléatoire dans `Config/DefaultEngine.ini` (jamais commité). Vérifié : après un nouveau
+   lancement de l'éditeur, plus aucun `SecurityToken` dans le fichier. Réactivation prévue à la fin de l'étape 4 (ROADMAP).
+3. **Cache de l'accélérateur de compilation (UBA) redirigé vers E:** (`BuildConfiguration.xml`), règle « tout sur E: ».
+4. **Défauts trouvés en cours de route et corrigés :** adresse du noyau coupée à `https:` (Unreal lit `//` comme un
+   commentaire dans les `.ini` → valeur entre guillemets + test) ; conflit de noms entre fichiers de tests en compilation
+   groupée ; focus clavier donné à un widget non focalisable.
+5. **Lancement réel par Claude partiel :** le client démarre sans erreur et l'écran « Se connecter » a été vérifié sur
+   une capture de la fenêtre, mais l'outil de contrôle de l'ordinateur ne reconnaît pas la fenêtre du client : le
+   parcours à l'écran (clics, saisie) est fait pour la première fois par le porteur en T4. La même logique est couverte
+   par les tests d'intégration contre le vrai noyau.
+6. Commits plus petits que prévus au § 13 (corrections séparées) ; scripts `build-unreal.ps1` livré avec le commit 3.

@@ -152,6 +152,10 @@ traiter les noms « sosies » (caractères qui se ressemblent d'un alphabet à l
 **Livrable :** déplacement à pied synchronisé (prédiction côté client, correction serveur), discussion textuelle de proximité, interactions simples (emotes, objets).
 **Validation :** déplacements fluides avec latence simulée ; une triche de vitesse côté client est corrigée par le serveur.
 **En fin d'étape :** test d'export sur Meta Quest / Android, pour mesurer tôt le coût du rendu sur ces plateformes (ADR-0003).
+À ce moment-là : **réactiver le plugin `AndroidFileServer`** dans `unreal/Eudoria.uproject` (désactivé le 2026-11-25,
+sous-étape 1.5) et **garder son jeton hors du dépôt** : l'éditeur écrit un `SecurityToken` aléatoire dans
+`Config/DefaultEngine.ini` (section `AndroidFileServerRuntimeSettings`) ; le placer dans un fichier de réglages non versionné
+(ex. `Saved/Config/`, ou une variable d'environnement), jamais dans un `.ini` commité.
 
 ## Étape 5 — Sauvegarde et persistance
 

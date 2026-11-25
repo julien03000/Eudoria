@@ -296,7 +296,8 @@ la carte de démarrage est la carte vide du moteur (`/Engine/Maps/Entry`).
 
 ```
 unreal/
-├── Eudoria.uproject                     # UE 5.8 (moteur du lanceur) ; plugins : EudoriaCore, Python (éditeur seul)
+├── Eudoria.uproject                     # UE 5.8 (moteur du lanceur) ; plugins : EudoriaCore, Python (éditeur seul) ;
+│                                        # AndroidFileServer DÉSACTIVÉ jusqu'à la fin de l'étape 4 (jeton écrit dans les .ini)
 ├── Config/
 │   ├── DefaultEngine.ini                # carte de démarrage, mode de jeu du front-end, DX12 / SM6
 │   ├── DefaultGame.ini                  # adresse du noyau (CoreBaseUrl, ENTRE GUILLEMETS : "//" = commentaire sinon)
@@ -311,6 +312,8 @@ unreal/
 │           ├── EudoriaLoginScreen       # « Se connecter »
 │           ├── EudoriaRegisterScreen    # « Créer un compte » (+ connexion automatique, message neutre)
 │           └── EudoriaWelcomeScreen     # « Bienvenue, <pseudo> » (GET /v1/me), « Se déconnecter »
+│   └── EudoriaEditor/                   # module ÉDITEUR SEUL (jamais livré) : vérifications de l'éditeur
+│       └── EudoriaBlueprintRules        # « aucune logique dans les Blueprints » (ADR-0003) + ses tests
 └── Plugins/EudoriaCore/                 # plugin socle (Runtime), ne dépend d'aucun monde
     └── Source/EudoriaCore/
         ├── EudoriaCoreSettings          # CoreBaseUrl, délai par requête (10 s)
@@ -332,5 +335,7 @@ unreal/
   traite un second usage du même jeton de renouvellement comme un vol et coupe toute la session (étape 1.3).
 - **Tests :** `tools/dev/test-unreal.ps1` (sans fenêtre, ~20 s) — lecture des réponses, messages, refus de `http://`,
   session avec un faux transport (dont « deux 401 simultanés → un seul renouvellement »), absence de secrets dans les
-  journaux, et tests d'intégration contre le noyau lancé (ignorés avec un avertissement s'il ne répond pas).
+  journaux, tests d'intégration contre le noyau lancé (ignorés avec un avertissement s'il ne répond pas), et
+  vérification « aucune logique Blueprint » (`Eudoria.Editor.*`, avec la preuve qu'un Blueprint fautif est détecté).
+  Cette vérification est en C++ : Python ne peut pas lire les nœuds des graphes (plan 1.5, § 14).
 - **Scripts :** `build-unreal.ps1` (compilation, éditeur fermé), `run-client.ps1` (client en fenêtre), `test-unreal.ps1`.

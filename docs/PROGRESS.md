@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-25 (1.5 : client écrit, testé (20 tests), lancé ; en attente de 2 décisions et de T4)
+**Dernière mise à jour :** 2026-11-25 (1.5 : client testé, décisions Blueprint et AndroidFileServer appliquées ; en attente de T4)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -68,10 +68,11 @@
   - **client lancé de mon côté** (`run-client.ps1`) : démarre sans erreur, écran « Se connecter » affiché (capture de la
     fenêtre vérifiée). **Parcours à l'écran non fait par moi** : l'outil de contrôle de l'ordinateur ne reconnaît pas la
     fenêtre du client (programme de l'éditeur, absent du menu Démarrer) → ce sera T4 ;
-  - **en attente de décisions du porteur** : (1) vérification « aucune logique Blueprint » — impossible en Python pur
-    (les nœuds des graphes sont protégés, et les fonctions de liste comptent les nœuds « fantômes » d'un Blueprint neuf) ;
-    (2) jeton `SecurityToken` de l'outil Android File Server réécrit dans `DefaultEngine.ini` à chaque lancement de
-    l'éditeur (jamais commité, retiré à la main à chaque fois) ;
+  - **décisions du porteur appliquées (2026-11-25)** : (1) vérification « aucune logique Blueprint » en **C++ éditeur**
+    (module `EudoriaEditor`, Python ne peut pas lire les nœuds) : 2 tests `Eudoria.Editor.*`, preuve avec un Blueprint
+    temporaire fautif (détecté puis supprimé, rien sur disque), mutation de la règle détectée ; écart noté au § 14 du plan ;
+    (2) plugin **AndroidFileServer désactivé** : après un nouveau lancement de l'éditeur, plus de `SecurityToken` dans
+    `DefaultEngine.ini` ; réactivation notée dans la ROADMAP (fin d'étape 4, jeton hors du dépôt) ;
   - première compilation : 91 s, 12 actions. Le journal d'UBT n'affiche pas le nombre de tâches parallèles :
     confirmation de `MaxParallelActions` = 6 toujours en attente (à voir sur une compilation plus grosse) ;
   - **cache de l'UBA redirigé vers E:** (règle « tout sur E: ») : il allait dans
@@ -208,8 +209,7 @@
 - **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
   local » remplis pour le noyau, en attente du client Unreal).
 
-1. **Porteur : décider** (a) comment vérifier « aucune logique Blueprint » (petit module C++ éditeur, voir le message de
-   fin de session du 2026-11-25) et (b) quoi faire du jeton Android File Server réécrit dans `DefaultEngine.ini`.
-2. **Porteur : T4** — noyau lancé (`start-db.ps1`, `run-core.ps1`), puis `run-client.ps1` : créer un compte, se
+1. **Porteur : T4** — noyau lancé (`start-db.ps1`, `run-core.ps1`), puis `run-client.ps1` : créer un compte, se
    connecter, voir « Bienvenue », se déconnecter, essayer un mauvais mot de passe ; rapporter ce qui s'affiche.
-3. Puis Claude : appliquer les décisions (a) et (b), cocher les critères de la ROADMAP, et T5 (validation de la 1.5).
+2. Puis Claude : corriger ce que T4 révèle, cocher les critères de l'étape 1 remplis par la 1.5 dans la ROADMAP,
+   et préparer T5 (validation de la 1.5 par le porteur).
