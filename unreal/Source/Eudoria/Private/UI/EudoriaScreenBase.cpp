@@ -59,6 +59,10 @@ UEditableTextBox* UEudoriaScreenBase::AddTextField(const FText& Hint, bool bIsPa
 	Field->SetHintText(Hint);
 	Field->SetIsPassword(bIsPassword);
 	Column->AddChildToVerticalBox(Field)->SetPadding(FMargin(0.0f, 4.0f));
+	if (!FirstField)
+	{
+		FirstField = Field;
+	}
 	return Field;
 }
 
@@ -98,6 +102,15 @@ void UEudoriaScreenBase::SetBusy(bool bBusy)
 	{
 		Button->SetIsEnabled(!bBusy);
 	}
+}
+
+UWidget* UEudoriaScreenBase::GetInitialFocus() const
+{
+	if (FirstField)
+	{
+		return FirstField;
+	}
+	return Buttons.IsEmpty() ? nullptr : Buttons[0].Get();
 }
 
 AEudoriaFrontEndPlayerController* UEudoriaScreenBase::GetFrontEnd() const

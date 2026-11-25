@@ -54,7 +54,10 @@ TScreen* AEudoriaFrontEndPlayerController::ShowScreen()
 	CurrentScreen = Screen;
 
 	FInputModeUIOnly InputMode;
-	InputMode.SetWidgetToFocus(Screen->TakeWidget());
+	if (UWidget* Focus = Screen->GetInitialFocus())
+	{
+		InputMode.SetWidgetToFocus(Focus->TakeWidget());
+	}
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(InputMode);
 	return Screen;

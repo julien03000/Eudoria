@@ -21,6 +21,10 @@ class EUDORIA_API UEudoriaScreenBase : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	/** Widget that gets keyboard focus when the screen appears: the first text field, else the first button. */
+	UWidget* GetInitialFocus() const;
+
 protected:
 	virtual void NativeOnInitialized() override;
 
@@ -52,4 +56,7 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UButton>> Buttons;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UEditableTextBox> FirstField;
 };
