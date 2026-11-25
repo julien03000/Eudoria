@@ -90,31 +90,45 @@ affichée en bas de l'installateur.
 
 ## Lancer le noyau en local (depuis l'étape 1.1)
 
-Prérequis : Docker Desktop **démarré**. Depuis la racine du dépôt, dans PowerShell :
+Prérequis : Docker Desktop **démarré**, et (depuis 1.5) le **certificat HTTPS de développement approuvé** :
+le noyau n'écoute qu'en HTTPS (`https://localhost:5443`). Une seule fois, **dans un onglet du panneau Terminal**
+(la fenêtre de confirmation de Windows doit pouvoir s'afficher) :
+
+```powershell
+dotnet dev-certs https --trust     # puis « Oui » dans l'avertissement de sécurité de Windows
+dotnet dev-certs https --check --trust   # vérification : « A trusted certificate was found »
+```
+
+Ce certificat ne vaut que pour `localhost` ; sa clé reste sur le PC. Unreal l'accepte aussi (il consulte le magasin
+de certificats de Windows). `run-core.ps1` refuse de démarrer s'il n'est pas approuvé. Il **expire le 2027-11-24** :
+le renouveler avec `dotnet dev-certs https --clean`, puis `dotnet dev-certs https --trust`. Pour tout retirer :
+`dotnet dev-certs https --clean`.
+
+Depuis la racine du dépôt, dans PowerShell :
 
 ```powershell
 Copy-Item .env.example .env       # une seule fois, puis remplacer le mot de passe dans .env
 .\tools\dev\new-signing-key.ps1   # une seule fois (depuis 1.3) : clé de signature des jetons, écrite dans .env sans être affichée
 .\tools\dev\start-db.ps1          # démarre PostgreSQL (attend qu'il soit prêt)
 .\tools\dev\migrate.ps1           # applique les migrations manquantes (à relancer après chaque nouvelle migration)
-.\tools\dev\run-core.ps1          # démarre le noyau sur http://localhost:5080
+.\tools\dev\run-core.ps1          # démarre le noyau sur https://localhost:5443
 ```
 
-Vérifier : <http://localhost:5080/v1/health/live> et <http://localhost:5080/v1/health/ready> → `{"status":"ok"}`.
+Vérifier : <https://localhost:5443/v1/health/live> et <https://localhost:5443/v1/health/ready> → `{"status":"ok"}`.
 Créer un compte (exemple) :
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/accounts -ContentType 'application/json' -Body '{"email":"ana@example.com","pseudo":"Ana_42","password":"une-phrase-de-passe-longue"}'
+Invoke-RestMethod -Method Post -Uri https://localhost:5443/v1/accounts -ContentType 'application/json' -Body '{"email":"ana@example.com","pseudo":"Ana_42","password":"une-phrase-de-passe-longue"}'
 ```
 → `status : accepted`. Rejouer la même commande → erreur 409 (`pseudo_taken`).
 
 Se connecter, consulter son profil, renouveler, se déconnecter (depuis 1.3) :
 
 ```powershell
-$session = Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/auth/login -ContentType 'application/json' -Body '{"email":"ana@example.com","password":"une-phrase-de-passe-longue"}'
-Invoke-RestMethod -Uri http://localhost:5080/v1/me -Headers @{ Authorization = "Bearer $($session.accessToken)" }
-$session = Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/auth/refresh -ContentType 'application/json' -Body (@{ refreshToken = $session.refreshToken } | ConvertTo-Json)
-Invoke-RestMethod -Method Post -Uri http://localhost:5080/v1/auth/logout -ContentType 'application/json' -Body (@{ refreshToken = $session.refreshToken } | ConvertTo-Json)
+$session = Invoke-RestMethod -Method Post -Uri https://localhost:5443/v1/auth/login -ContentType 'application/json' -Body '{"email":"ana@example.com","password":"une-phrase-de-passe-longue"}'
+Invoke-RestMethod -Uri https://localhost:5443/v1/me -Headers @{ Authorization = "Bearer $($session.accessToken)" }
+$session = Invoke-RestMethod -Method Post -Uri https://localhost:5443/v1/auth/refresh -ContentType 'application/json' -Body (@{ refreshToken = $session.refreshToken } | ConvertTo-Json)
+Invoke-RestMethod -Method Post -Uri https://localhost:5443/v1/auth/logout -ContentType 'application/json' -Body (@{ refreshToken = $session.refreshToken } | ConvertTo-Json)
 ```
 → `/me` renvoie `id`, `pseudo`, `createdAt`. Après la déconnexion, `refresh` avec le même jeton → 401.
 

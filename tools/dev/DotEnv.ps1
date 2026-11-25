@@ -18,7 +18,7 @@ function Read-EudoriaDotEnv {
         if ($separator -lt 1) { throw "Invalid line in .env (expected KEY=VALUE): '$trimmed'" }
         $values[$trimmed.Substring(0, $separator).Trim()] = $trimmed.Substring($separator + 1).Trim()
     }
-    foreach ($required in 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_PORT', 'CORE_HTTP_PORT') {
+    foreach ($required in 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_PORT', 'CORE_HTTPS_PORT') {
         if (-not $values.ContainsKey($required) -or $values[$required] -eq '') {
             throw "Missing value for $required in .env (see .env.example)."
         }

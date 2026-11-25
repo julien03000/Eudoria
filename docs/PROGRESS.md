@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-25 (plan 1.5 validé ; en attente de T1 et T2)
+**Dernière mise à jour :** 2026-11-25 (plan 1.5 validé ; noyau en HTTPS fait)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -38,7 +38,14 @@
 - **Plan de la sous-étape 1.5 ✅ validé par le porteur le 2026-11-25** (`docs/plans/etape-01-5.md`) : les 5
   recommandations du § 10 + complément sur le renouvellement (§ 10.1 : **un seul `/auth/refresh` à la fois**, les
   requêtes en 401 attendent son résultat puis sont rejouées ; test « deux 401 simultanés → un seul renouvellement »).
-  **Aucun code de la 1.5 n'est écrit** ; en attente des actions T1 (lanceur Epic) et T2 (certificat) du porteur.
+  T1 (5.8.4 visible dans la Bibliothèque du lanceur) et T2 (certificat approuvé) **faits par le porteur le 2026-11-25**.
+- **1.5 — noyau en HTTPS fait (2026-11-25)** : `run-core.ps1` écoute sur `https://localhost:5443` seulement et refuse
+  de démarrer si le certificat de .NET n'est pas approuvé ; `.env.example` et `.env` : `CORE_HTTPS_PORT=5443` ; contrat
+  core-v1 **1.3.1** (adresse de développement) ; `docs/SETUP.md` (procédure du certificat, expiration 2027-11-24).
+  Vérifié en réel : `curl` **sans `-k`** → 200 (certificat vérifié) ; HTTP refusé (5443 et 5080) ; inscription →
+  connexion → `/me` → renouvellement → déconnexion → renouvellement refusé (401) ; journal sans `fail:`/`warn:`, sans
+  mot de passe ni jeton. **229 tests passent**, build 0 avertissement, format propre. Non testé en réel : le message
+  d'arrêt de `run-core.ps1` quand le certificat n'est pas approuvé (il aurait fallu retirer l'approbation).
   Vérifications faites pour le plan :
   - `LauncherInstalled.dat` liste désormais UE 5.8.4 (`E:\Epic Games\UE_5.8`) → problème résolu ; reste le
     contrôle visuel dans la Bibliothèque du lanceur (action T1 du plan) ;
@@ -166,7 +173,7 @@
 - **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
   local » remplis pour le noyau, en attente du client Unreal).
 
-1. **Porteur : T1** — lanceur Epic → Unreal Engine → Bibliothèque : 5.8.4 listé comme installé ? (plan 1.5, § 7).
-2. **Porteur : T2** — dans un onglet du panneau Terminal : `dotnet dev-certs https --trust`, puis « Oui » dans la
-   fenêtre de Windows. Claude vérifie ensuite avec `dotnet dev-certs https --check --trust` (code 0 attendu).
-3. Puis Claude : commit 2 du plan (`feat(core)` : noyau en HTTPS sur `localhost:5443`), et la suite du § 7.
+1. **Claude : commit 3 du plan 1.5** — fichiers texte du projet Unreal (`unreal/Eudoria.uproject`, cibles, `Build.cs`,
+   plugin `EudoriaCore`, `Config/*.ini`), puis génération des fichiers de projet et première compilation éditeur fermé
+   (§ 7, points 2 et 3 de « Ce que je ferai ») ; relever dans le journal d'UBT le nombre de tâches parallèles.
+2. Ensuite : T3 par le porteur (premier lancement de l'éditeur, shaders).
