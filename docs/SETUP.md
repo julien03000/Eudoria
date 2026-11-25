@@ -83,6 +83,7 @@ affichée en bas de l'installateur.
 | Cache | Emplacement par défaut | Taille actuelle | Quand |
 |---|---|---|---|
 | Cache de données dérivées Unreal (DDC, Zen) | `%LOCALAPPDATA%\UnrealEngine\Common` | ✅ **Redirigé le 2026-11-24** vers `E:\Dev\UnrealCache\DDC` (Zen dans `...\DDC\Zen`) par la variable d'environnement utilisateur `UE-LocalDataCachePath` ; anciens caches supprimés | Fait |
+| Cache de l'accélérateur de compilation Unreal (UBA) | `C:\ProgramData\Epic\UnrealBuildAccelerator` (jusqu'à 40 Go) | ✅ **Redirigé le 2026-11-25** vers `E:\Dev\UnrealCache\UBA` (`BuildConfiguration.xml`, `UnrealBuildAccelerator/RootDir`) ; l'ancien dossier de C: est vide, supprimable | Fait |
 | Paquets NuGet (.NET) | `%USERPROFILE%\.nuget\packages` | ✅ **Redirigé le 2026-11-24** vers `E:\Dev\NuGet\packages` (variable utilisateur `NUGET_PACKAGES`) | Fait |
 | Cache de téléchargement Visual Studio | `C:\ProgramData\Microsoft\VisualStudio\Packages` | — | À l'installation de VS |
 | Disque virtuel Docker (WSL 2) | `%LOCALAPPDATA%\Docker` | — | À l'installation de Docker |
@@ -154,6 +155,25 @@ Notes :
   (environ 9 Mo) dans `%TEMP%\dotnet\runfile` sur C: (supprimable).
 - `run-core.ps1` vise `127.0.0.1` et non `localhost` : `localhost` se résout d'abord en IPv6 (`::1`), où la base
   n'écoute pas, et Windows met environ 2 s à abandonner, soit tout le délai du contrôle de santé.
+
+## Lancer le client Unreal (depuis l'étape 1.5)
+
+Prérequis : le noyau lancé (section précédente, HTTPS sur `https://localhost:5443`). **Éditeur Unreal fermé** pour
+compiler et tester. Depuis la racine du dépôt :
+
+```powershell
+.\tools\dev\build-unreal.ps1     # compile nos modules (éditeur fermé) ; -ProjectFiles régénère unreal\Eudoria.sln
+.\tools\dev\test-unreal.ps1      # tests d'automatisation Eudoria.* sans fenêtre (~20 s)
+.\tools\dev\run-client.ps1       # ouvre le client en fenêtre 1280×720, écran « Se connecter »
+```
+
+Notes :
+- Journaux : `unreal\Saved\Logs\EudoriaClient.log` (client), `EudoriaTests.log` (tests), `Eudoria.log` (éditeur).
+- L'adresse du noyau est dans `unreal\Config\DefaultGame.ini` (`CoreBaseUrl`), **entre guillemets** : sans eux, Unreal lit
+  `//` comme un commentaire et l'adresse devient `https:` (le test `Eudoria.Core.Api.ConfiguredUrlIsSecure` le détecte).
+- Les tests `Eudoria.Integration.*` créent de vrais comptes de test (`ue-…@example.com`) dans la base locale.
+- Si l'éditeur propose de « reconstruire » des modules : répondre **Non** et compiler avec `build-unreal.ps1`.
+- 16 Go de RAM : ne pas compiler pendant que l'éditeur ou le client tourne.
 
 ## Plan d'installation — Visual Studio 2026 et Docker Desktop (en attente de validation)
 

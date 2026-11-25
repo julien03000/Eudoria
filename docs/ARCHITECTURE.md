@@ -288,3 +288,49 @@ core/
   un délai maximum de 2 s et répond 503 sinon. Aucune réponse ne contient de détail interne : les causes
   sont dans les journaux du serveur seulement.
 - **Tests :** xUnit v3 ; base PostgreSQL réelle et jetable créée dans Docker à chaque série de tests, migrations appliquées.
+
+## 9. Le client Unreal aujourd'hui (étape 1.5)
+
+Projet écrit en fichiers texte (aucun assistant de l'éditeur), **sans aucun fichier binaire** pour l'instant :
+la carte de démarrage est la carte vide du moteur (`/Engine/Maps/Entry`).
+
+```
+unreal/
+├── Eudoria.uproject                     # UE 5.8 (moteur du lanceur) ; plugins : EudoriaCore, Python (éditeur seul)
+├── Config/
+│   ├── DefaultEngine.ini                # carte de démarrage, mode de jeu du front-end, DX12 / SM6
+│   ├── DefaultGame.ini                  # adresse du noyau (CoreBaseUrl, ENTRE GUILLEMETS : "//" = commentaire sinon)
+│   └── DefaultInput.ini                 # réglages d'entrée par défaut (écrits par l'éditeur)
+├── Source/
+│   ├── Eudoria.Target.cs / EudoriaEditor.Target.cs
+│   └── Eudoria/                         # module principal : le front-end du client
+│       ├── EudoriaFrontEndGameMode      # pas de pion, pas de HUD
+│       ├── EudoriaFrontEndPlayerController  # souris visible, saisie « interface seule », un écran à la fois
+│       └── UI/                          # écrans construits en C++ (UMG, sans Widget Blueprint)
+│           ├── EudoriaScreenBase        # colonne centrée, champs, boutons, ligne de message
+│           ├── EudoriaLoginScreen       # « Se connecter »
+│           ├── EudoriaRegisterScreen    # « Créer un compte » (+ connexion automatique, message neutre)
+│           └── EudoriaWelcomeScreen     # « Bienvenue, <pseudo> » (GET /v1/me), « Se déconnecter »
+└── Plugins/EudoriaCore/                 # plugin socle (Runtime), ne dépend d'aucun monde
+    └── Source/EudoriaCore/
+        ├── EudoriaCoreSettings          # CoreBaseUrl, délai par requête (10 s)
+        ├── EudoriaCoreApi               # lecture PURE des réponses du contrat core-v1 + messages en français
+        ├── EudoriaHttpTransport         # interface d'envoi + version réelle (module HTTP d'Unreal) ; refuse tout sauf https://
+        ├── EudoriaSession               # jetons EN MÉMOIRE seulement ; renouvellement unique (ci-dessous)
+        ├── EudoriaSessionSubsystem      # sous-système de l'instance de jeu : possède la session
+        └── Private/Tests/               # tests d'automatisation (catégorie Eudoria.*)
+```
+
+- **HTTPS :** le client refuse d'envoyer quoi que ce soit si l'adresse n'est pas en `https://`. Le certificat du noyau est
+  vérifié par Unreal (libcurl + magasin de certificats de Windows) : le certificat de développement .NET approuvé suffit.
+- **Session :** jetons d'accès et de renouvellement gardés en mémoire, jamais sur disque ni dans les journaux (testé).
+  Déconnexion = oubli immédiat des jetons puis `POST /auth/logout`. Fermer le client oublie aussi les jetons.
+- **Renouvellement unique (plan 1.5, § 10.1) :** une requête qui reçoit 401 déclenche **un seul** `/auth/refresh`, même si
+  plusieurs requêtes reçoivent 401 en même temps ; les autres attendent son résultat et sont **rejouées une fois** avec le
+  nouveau jeton. Une requête partie avec un jeton déjà remplacé est rejouée sans nouveau renouvellement. Échec du
+  renouvellement, ou 401 sur une requête déjà rejouée → session terminée, retour à « Se connecter ». Raison : le noyau
+  traite un second usage du même jeton de renouvellement comme un vol et coupe toute la session (étape 1.3).
+- **Tests :** `tools/dev/test-unreal.ps1` (sans fenêtre, ~20 s) — lecture des réponses, messages, refus de `http://`,
+  session avec un faux transport (dont « deux 401 simultanés → un seul renouvellement »), absence de secrets dans les
+  journaux, et tests d'intégration contre le noyau lancé (ignorés avec un avertissement s'il ne répond pas).
+- **Scripts :** `build-unreal.ps1` (compilation, éditeur fermé), `run-client.ps1` (client en fenêtre), `test-unreal.ps1`.

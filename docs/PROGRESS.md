@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-25 (1.5 : noyau en HTTPS ; client Unreal écrit et compilé ; en attente de T3)
+**Dernière mise à jour :** 2026-11-25 (1.5 : client écrit, testé (20 tests), lancé ; en attente de 2 décisions et de T4)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -55,7 +55,23 @@
     unique** (§ 10.1 du plan) ;
   - front-end : écrans « Se connecter », « Créer un compte » (connexion automatique, message neutre), « Bienvenue »,
     construits en C++ (UMG) ; mode de jeu et contrôleur ;
-  - **pas encore lancé** (ni éditeur, ni client) et **pas encore de tests Unreal** (commit 6, après T3) ;
+  - **T3 fait par le porteur (2026-11-25)** : éditeur ouvert en ~3 min (shaders du moteur servis par le cache fourni),
+    aucune question posée ; journal : `Found local data cache path=E:\Dev\UnrealCache\DDC` ✅, notre module chargé,
+    aucune erreur venant de notre code (des « Condition failed » internes au moteur au démarrage, sans lien) ;
+  - **tests Unreal : 20 sur 20 passent** (`tools/dev/test-unreal.ps1`, ~20 s, noyau lancé), dont
+    « deux 401 simultanés → un seul renouvellement » et sa variante d'échec ; l'intégration prouve qu'Unreal accepte le
+    certificat HTTPS approuvé. **3 tests de mutation détectés** (409 lu comme 400 ; `http://` accepté ; garde du
+    renouvellement unique retirée → les deux tests du § 10.1 échouent) ;
+  - défauts trouvés et corrigés : adresse du noyau coupée à `https:` (Unreal lit `//` comme un commentaire dans les
+    `.ini` → valeur entre guillemets + test) ; conflit de noms entre fichiers de tests en compilation groupée (« unity ») ;
+    focus clavier donné à un widget non focalisable (erreur au démarrage du client) ;
+  - **client lancé de mon côté** (`run-client.ps1`) : démarre sans erreur, écran « Se connecter » affiché (capture de la
+    fenêtre vérifiée). **Parcours à l'écran non fait par moi** : l'outil de contrôle de l'ordinateur ne reconnaît pas la
+    fenêtre du client (programme de l'éditeur, absent du menu Démarrer) → ce sera T4 ;
+  - **en attente de décisions du porteur** : (1) vérification « aucune logique Blueprint » — impossible en Python pur
+    (les nœuds des graphes sont protégés, et les fonctions de liste comptent les nœuds « fantômes » d'un Blueprint neuf) ;
+    (2) jeton `SecurityToken` de l'outil Android File Server réécrit dans `DefaultEngine.ini` à chaque lancement de
+    l'éditeur (jamais commité, retiré à la main à chaque fois) ;
   - première compilation : 91 s, 12 actions. Le journal d'UBT n'affiche pas le nombre de tâches parallèles :
     confirmation de `MaxParallelActions` = 6 toujours en attente (à voir sur une compilation plus grosse) ;
   - **cache de l'UBA redirigé vers E:** (règle « tout sur E: ») : il allait dans
@@ -192,9 +208,8 @@
 - **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
   local » remplis pour le noyau, en attente du client Unreal).
 
-1. **Porteur : T3** — premier lancement de l'éditeur (double-clic sur `unreal/Eudoria.uproject`), programmes lourds
-   fermés, attendre la fin des shaders ; « reconstruire les modules ? » → **Non** et prévenir Claude ; puis fermer.
-   Rapporter : durée, fenêtres ou messages vus, ralentissements du PC.
-2. Puis Claude : lire le journal de l'éditeur (`unreal/Saved/Logs/Eudoria.log` : ligne `Found local data cache path=`
-   sur E:, erreurs) ; commit 6 (tests d'automatisation, dont « deux 401 → un seul renouvellement », + script « aucune
-   logique Blueprint ») ; commit 7 (`run-client.ps1`, `test-unreal.ps1`) ; lancement réel du client ; puis T4.
+1. **Porteur : décider** (a) comment vérifier « aucune logique Blueprint » (petit module C++ éditeur, voir le message de
+   fin de session du 2026-11-25) et (b) quoi faire du jeton Android File Server réécrit dans `DefaultEngine.ini`.
+2. **Porteur : T4** — noyau lancé (`start-db.ps1`, `run-core.ps1`), puis `run-client.ps1` : créer un compte, se
+   connecter, voir « Bienvenue », se déconnecter, essayer un mauvais mot de passe ; rapporter ce qui s'affiche.
+3. Puis Claude : appliquer les décisions (a) et (b), cocher les critères de la ROADMAP, et T5 (validation de la 1.5).
