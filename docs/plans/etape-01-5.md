@@ -1,7 +1,8 @@
 # Étape 1.5 — Projet Unreal en C++ et client minimal de connexion
 
-- **Statut :** 📝 Plan proposé, **en attente du « OK » du porteur**
-- **Date :** 2026-11-24
+- **Statut :** ✅ Plan **validé par le porteur le 2026-11-25** : les 5 recommandations du § 10, avec un complément
+  sur la décision 3 (renouvellement unique, voir § 10.1)
+- **Date :** 2026-11-24 (validé le 2026-11-25)
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.5 **uniquement** : créer le projet Unreal dans `unreal/` (C++, plugin socle
   `EudoriaCore`) et un client PC minimal avec trois écrans : « Créer un compte », « Se connecter »,
@@ -105,7 +106,7 @@ unreal/
   de renouvellement **uniquement en mémoire** ; rien sur disque, **jamais** de jeton ni de mot de passe dans les
   journaux (vérifié par un test). Déconnexion = appel `/auth/logout` puis effacement de la mémoire. Fermer le client
   efface aussi la mémoire (la session reste valide côté noyau jusqu'à son expiration, comme prévu en 1.3).
-- **Renouvellement** : voir décision 3 (§ 10).
+- **Renouvellement** : voir décision 3 (§ 10) et son complément (§ 10.1) : **un seul renouvellement à la fois**.
 
 ### 4.2 Le front-end `Eudoria`
 - Au lancement : écran « Se connecter » (e-mail, mot de passe masqué, bouton « Se connecter », lien « Créer un compte »).
@@ -199,6 +200,11 @@ Aucune autre action dans l'éditeur n'est prévue : pas de Blueprint ni de Widge
 - *Sans réseau* : lecture de chaque réponse du contrat (202, 200, 400 avec plusieurs erreurs, 401, 409, 429 avec
   `Retry-After`, 503, JSON invalide, réponse vide, délai dépassé) ; traduction des codes en messages ; refus d'une
   adresse `http://` ; la session est vide après déconnexion ; aucun jeton ni mot de passe dans le texte journalisé.
+- *Renouvellement unique* (§ 10.1, demandé par le porteur ; sans réseau, avec un faux transport HTTP qui retient
+  les réponses pour simuler la simultanéité) : **deux requêtes reçoivent 401 en même temps → un seul appel
+  `/auth/refresh`**, et les deux sont rejouées avec le nouveau jeton d'accès. Même test, variante d'échec : le
+  renouvellement échoue → toujours un seul appel, les deux requêtes échouent, la session est vidée (retour à
+  « Se connecter »).
 - *Avec le noyau lancé* (catégorie `Eudoria.Integration.*`, ignorée si le noyau ne répond pas, avec un avertissement
   explicite) : inscription → connexion → `GET /me` → déconnexion → le jeton de renouvellement est refusé ; pseudo
   déjà pris → message attendu ; mauvais mot de passe → message neutre.
@@ -245,6 +251,29 @@ lancement réel fait (par moi puis par toi), documentation à jour, commit et pu
    - B : pas de renouvellement en 1.5 (reporté à la 1.7).
 4. **Connexion automatique après « Créer un compte »** (§ 4.2) — recommandé : oui, avec le message neutre.
 5. **Projet créé en fichiers texte par moi** (§ 3) plutôt que par l'assistant de l'éditeur — recommandé : oui.
+
+**Décisions du porteur (2026-11-25) :** 1 = A (écrans en C++), 2 = A (certificat .NET approuvé, HTTPS seul sur 5443),
+3 = A avec le complément du § 10.1, 4 = oui, 5 = oui.
+
+### 10.1 Complément du porteur sur la décision 3 : un seul renouvellement à la fois
+
+**Pourquoi :** depuis la 1.3, présenter deux fois le même jeton de renouvellement est traité comme un vol
+(réutilisation détectée → **toute la session est révoquée**). Si deux requêtes reçoivent 401 en même temps et
+lancent chacune leur `/auth/refresh` avec le même jeton, la seconde serait vue comme une réutilisation et
+couperait la session du joueur.
+
+**Règle :**
+- Le sous-système de session ne lance **qu'un seul** `/auth/refresh` à la fois. Une requête qui reçoit 401 pendant
+  qu'un renouvellement est en cours **ne lance rien** : elle attend son résultat.
+- Renouvellement réussi → chaque requête en attente est **rejouée une fois** avec le nouveau jeton d'accès.
+- Renouvellement échoué → toutes les requêtes en attente échouent, la session est vidée, retour à « Se connecter ».
+- Une requête partie avec un jeton d'accès **déjà remplacé** (renouvellement terminé entre son envoi et son 401) est
+  simplement rejouée avec le jeton actuel, **sans** nouveau renouvellement.
+- Une requête rejouée qui reçoit encore 401 ne déclenche pas de second renouvellement : échec, retour à « Se connecter »
+  (pas de boucle).
+- Tout se passe sur le fil principal du jeu (les réponses HTTP d'Unreal y arrivent) : pas de verrou à gérer.
+
+**Test ajouté** (§ 8) : deux 401 simultanés provoquent un seul appel de renouvellement.
 
 ---
 

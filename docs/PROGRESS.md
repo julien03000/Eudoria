@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-24 (plan 1.5 rédigé, en attente de validation)
+**Dernière mise à jour :** 2026-11-25 (plan 1.5 validé ; en attente de T1 et T2)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,8 +35,10 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
-- **Plan de la sous-étape 1.5 rédigé le 2026-11-24, en attente de validation** (`docs/plans/etape-01-5.md`).
-  Le porteur a des remarques à faire avant de le valider. **Aucun code de la 1.5 n'est écrit.**
+- **Plan de la sous-étape 1.5 ✅ validé par le porteur le 2026-11-25** (`docs/plans/etape-01-5.md`) : les 5
+  recommandations du § 10 + complément sur le renouvellement (§ 10.1 : **un seul `/auth/refresh` à la fois**, les
+  requêtes en 401 attendent son résultat puis sont rejouées ; test « deux 401 simultanés → un seul renouvellement »).
+  **Aucun code de la 1.5 n'est écrit** ; en attente des actions T1 (lanceur Epic) et T2 (certificat) du porteur.
   Vérifications faites pour le plan :
   - `LauncherInstalled.dat` liste désormais UE 5.8.4 (`E:\Epic Games\UE_5.8`) → problème résolu ; reste le
     contrôle visuel dans la Bibliothèque du lanceur (action T1 du plan) ;
@@ -164,5 +166,7 @@
 - **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
   local » remplis pour le noyau, en attente du client Unreal).
 
-1. **Recueillir les remarques du porteur sur le plan 1.5** (`docs/plans/etape-01-5.md`, notamment les 5 points du
-   § 10), modifier le plan si besoin, puis attendre son « OK ». **Ne rien coder de la 1.5 avant cet accord.**
+1. **Porteur : T1** — lanceur Epic → Unreal Engine → Bibliothèque : 5.8.4 listé comme installé ? (plan 1.5, § 7).
+2. **Porteur : T2** — dans un onglet du panneau Terminal : `dotnet dev-certs https --trust`, puis « Oui » dans la
+   fenêtre de Windows. Claude vérifie ensuite avec `dotnet dev-certs https --check --trust` (code 0 attendu).
+3. Puis Claude : commit 2 du plan (`feat(core)` : noyau en HTTPS sur `localhost:5443`), et la suite du § 7.
