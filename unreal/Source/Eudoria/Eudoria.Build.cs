@@ -8,6 +8,6 @@ public class Eudoria : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
-		PrivateDependencyModuleNames.AddRange(new string[] { "EudoriaCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "EudoriaCore", "UMG", "Slate", "SlateCore" });
 	}
 }
