@@ -93,8 +93,8 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
    sur le poste du porteur (images/s, mémoire vidéo, RAM) et **valider l'ADR-0003**.
 
 ### Critères de validation
-- [ ] Je peux créer un compte depuis le client Unreal sur PC, puis me connecter avec.
-- [ ] Le client Unreal ne contient aucune logique dans les graphes Blueprint (vérifié par script).
+- [x] Je peux créer un compte depuis le client Unreal sur PC, puis me connecter avec. *(1.5, test réel T4 du porteur le 2026-11-25)*
+- [x] Le client Unreal ne contient aucune logique dans les graphes Blueprint (vérifié par script). *(1.5 : test d'automatisation C++ éditeur `Eudoria.Editor.NoBlueprintLogic`, preuve sur un Blueprint fautif ; Python ne peut pas lire les nœuds, plan 1.5 § 14)*
 - [x] Deux comptes ne peuvent pas avoir le même pseudo ni le même e-mail. *(1.2, garanti par la base, testé en concurrence)*
 - [x] Un mauvais mot de passe est refusé ; après N échecs, les tentatives sont temporairement bloquées. *(1.3 + 1.4)*
 - [x] Le mot de passe n'apparaît en clair ni en base, ni dans les logs. *(1.2 à 1.4, tests des journaux + lancement réel)*
@@ -102,8 +102,8 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 - [x] Après déconnexion, le jeton de renouvellement ne fonctionne plus. *(1.3 ; et « tout déconnecter » coupe aussi les jetons d'accès, 1.4)*
 - [ ] Un composant tiers (simulé dans les tests) peut vérifier un jeton et obtenir l'identifiant du compte.
 - [ ] Après connexion, la scène de test (Lumen + Nanite, assets Fab) tourne de façon **fluide en qualité Haute** sur le poste du porteur, et les mesures (images/s, mémoire vidéo, RAM) sont notées dans `docs/`.
-- [ ] Les tests passent, sans erreur de compilation ni de lint. *(rempli pour le noyau à la 1.4 : 229 tests ; reste le client Unreal)*
-- [ ] Tout se lance en local en suivant une procédure écrite de quelques commandes. *(rempli pour le noyau : `docs/SETUP.md` + scripts `tools/dev/` ; reste le client Unreal)*
+- [ ] Les tests passent, sans erreur de compilation ni de lint. *(noyau : 229 tests ; client Unreal : 22 tests, 0 avertissement dans notre code (1.5) ; à revérifier à la fin de l'étape, après 1.6 et 1.7)*
+- [x] Tout se lance en local en suivant une procédure écrite de quelques commandes. *(noyau et client : `docs/SETUP.md` + scripts `tools/dev/`, 1.5)*
 
 ### Découpage prévisionnel (à confirmer au démarrage de l'étape)
 1. Squelette du noyau + environnement local (base de données, configuration, une route « santé »).
@@ -114,7 +114,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
    - **égaliser le chemin** « e-mail déjà utilisé » et « inscription réussie » (mêmes requêtes, même durée ; écart de ~5 ms mesuré en 1.2) ;
    - **garder la capture des courses** (refus d'unicité de PostgreSQL lors d'inscriptions simultanées → mêmes réponses) ;
    - **supprimer l'erreur EF Core des journaux** pour un e-mail déjà utilisé (cas normal, pas une panne).
-5. Création du projet Unreal (C++, plugin socle, Git LFS) et client minimal.
+5. Création du projet Unreal (C++, plugin socle, Git LFS) et client minimal. ✅ *(validée le 2026-11-25)*
 6. Vérification de jeton par un service tiers.
    Les serveurs de monde ne reçoivent jamais le jeton d'accès du noyau : le noyau délivre un ticket d'entrée de
    courte durée, avec une audience propre à chaque monde. Il faut concevoir ce mécanisme en 1.6.
@@ -192,3 +192,16 @@ sous-étape 1.5) et **garder son jeton hors du dépôt** : l'éditeur écrit un 
 **Objectif :** permettre à d'autres de créer des contenus/mondes.
 **Livrable :** premier kit de création (objets ou petits espaces) et processus de publication contrôlé (validation, isolation, modération).
 **Validation :** un contenu créé par un utilisateur est publié, visité par d'autres, et ne peut pas compromettre le noyau.
+
+---
+
+## Chantiers transverses (plus tard)
+
+Chantiers qui ne sont pas une étape à eux seuls ; on les ouvre quand leurs prérequis sont remplis.
+
+- **Identité visuelle et ergonomie des interfaces** *(ajouté par le porteur le 2026-11-25)* : définir l'identité
+  d'EUDORIA (couleurs, typographie, style), puis refaire les écrans de connexion, d'inscription et de bienvenue
+  (contraste insuffisant aujourd'hui, par exemple le texte d'aide gris clair sur fond gris clair).
+  - **Prérequis :** identité visuelle définie.
+  - **À reconsidérer au plus tard avec l'éditeur d'avatar (étape 2) :** Widget Blueprints pour la mise en page, comme
+    prévu par l'ADR-0003 (aujourd'hui, les écrans sont construits en C++ : décision 1 du plan 1.5).

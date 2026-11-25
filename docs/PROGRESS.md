@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-25 (1.5 : client testé, décisions Blueprint et AndroidFileServer appliquées ; en attente de T4)
+**Dernière mise à jour :** 2026-11-25 (sous-étape 1.5 validée ; prochaine : plan de la 1.6)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,6 +35,12 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
+- **Sous-étape 1.5 réalisée et ✅ validée par le porteur le 2026-11-25** (T5), après son test réel **T4 réussi** :
+  création de compte, connexion, « Bienvenue », déconnexion, mauvais mot de passe refusé. Journaux de T4 relus : aucune
+  erreur, aucun jeton ni mot de passe (seulement des noms de colonnes SQL). Remarque du porteur : contraste insuffisant
+  des écrans (texte d'aide gris clair sur fond gris clair) → chantier transverse « Identité visuelle et ergonomie des
+  interfaces » ajouté à la ROADMAP. ROADMAP : 4 critères de l'étape 1 cochés (8 sur 11 ; restent la vérification de
+  jeton par un tiers (1.6), la scène de rendu (1.7), et « les tests passent » à revérifier en fin d'étape).
 - **Plan de la sous-étape 1.5 ✅ validé par le porteur le 2026-11-25** (`docs/plans/etape-01-5.md`) : les 5
   recommandations du § 10 + complément sur le renouvellement (§ 10.1 : **un seul `/auth/refresh` à la fois**, les
   requêtes en 401 attendent son résultat puis sont rejouées ; test « deux 401 simultanés → un seul renouvellement »).
@@ -206,10 +212,12 @@
 
 ## ⏭️ Prochaine étape exacte
 - *Non bloquant, quand le PC est au repos :* refaire les mesures de durée de la 1.4 (voir « Problèmes connus »).
-- **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
-  local » remplis pour le noyau, en attente du client Unreal).
+- **ROADMAP :** 8 critères de l'étape 1 sur 11 cochés (1.1 à 1.5).
+- *Petit défaut connu, non bloquant :* `start-db.ps1` lancé avec toute sa sortie redirigée (`*>`, comme le fait Claude)
+  échoue sur le message normal de Docker « Container … Running » (PowerShell 5.1 le prend pour une erreur). Sans effet
+  quand le porteur lance le script lui-même. Correction possible (petit changement) : à proposer au porteur.
 
-1. **Porteur : T4** — noyau lancé (`start-db.ps1`, `run-core.ps1`), puis `run-client.ps1` : créer un compte, se
-   connecter, voir « Bienvenue », se déconnecter, essayer un mauvais mot de passe ; rapporter ce qui s'affiche.
-2. Puis Claude : corriger ce que T4 révèle, cocher les critères de l'étape 1 remplis par la 1.5 dans la ROADMAP,
-   et préparer T5 (validation de la 1.5 par le porteur).
+1. **Claude : rédiger le plan de la sous-étape 1.6** — vérification d'un jeton par un service tiers : le noyau délivre
+   un **ticket d'entrée** de courte durée, avec une audience propre à chaque monde (le jeton d'accès `eudoria-core`
+   n'est jamais transmis aux mondes ; décision du 2026-11-24, ROADMAP § découpage). Créer `docs/plans/etape-01-6.md`,
+   le présenter au porteur et **attendre son « OK » avant tout code**.

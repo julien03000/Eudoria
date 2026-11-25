@@ -1,7 +1,8 @@
 # Étape 1.5 — Projet Unreal en C++ et client minimal de connexion
 
-- **Statut :** ✅ Plan **validé par le porteur le 2026-11-25** : les 5 recommandations du § 10, avec un complément
-  sur la décision 3 (renouvellement unique, voir § 10.1)
+- **Statut :** ✅ **Sous-étape réalisée et validée par le porteur le 2026-11-25** (test réel T4 réussi). Plan validé le
+  même jour : les 5 recommandations du § 10, avec un complément sur la décision 3 (renouvellement unique, § 10.1).
+  Écarts de réalisation : § 14.
 - **Date :** 2026-11-24 (validé le 2026-11-25)
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.5 **uniquement** : créer le projet Unreal dans `unreal/` (C++, plugin socle
