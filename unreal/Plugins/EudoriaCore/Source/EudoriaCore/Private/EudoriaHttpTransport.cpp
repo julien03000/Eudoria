@@ -16,8 +16,8 @@ void FEudoriaHttpModuleTransport::Send(const FEudoriaHttpRequest& Request, FEudo
 {
 	if (!EudoriaCoreApi::IsSecureBaseUrl(BaseUrl))
 	{
-		UE_LOG(LogEudoriaCore, Error, TEXT("Request %s %s not sent: the core URL must use https:// (CoreBaseUrl in DefaultGame.ini)."),
-			*Request.Verb, *Request.Path);
+		UE_LOG(LogEudoriaCore, Error, TEXT("Request %s %s not sent: the core URL '%s' must use https:// (CoreBaseUrl in DefaultGame.ini)."),
+			*Request.Verb, *Request.Path, *BaseUrl);
 		FEudoriaHttpResponse Refused;
 		Refused.TransportStatus = EEudoriaTransportStatus::RefusedInsecureUrl;
 		OnComplete(Refused);
