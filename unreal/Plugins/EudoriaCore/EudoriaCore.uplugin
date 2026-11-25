@@ -1,0 +1,19 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "EUDORIA Core",
+	"Description": "Foundation plugin: core settings, core API client and player session. Depends on no world.",
+	"Category": "EUDORIA",
+	"CreatedBy": "EUDORIA",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "EudoriaCore",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
