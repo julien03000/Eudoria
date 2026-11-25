@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-25 (plan 1.5 validé ; noyau en HTTPS fait)
+**Dernière mise à jour :** 2026-11-25 (1.5 : noyau en HTTPS ; client Unreal écrit et compilé ; en attente de T3)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -46,6 +46,22 @@
   connexion → `/me` → renouvellement → déconnexion → renouvellement refusé (401) ; journal sans `fail:`/`warn:`, sans
   mot de passe ni jeton. **229 tests passent**, build 0 avertissement, format propre. Non testé en réel : le message
   d'arrêt de `run-core.ps1` quand le certificat n'est pas approuvé (il aurait fallu retirer l'approbation).
+- **1.5 — client Unreal, commits 3 à 5 faits (2026-11-25)**, chacun compilé (`tools/dev/build-unreal.ps1`, éditeur
+  fermé) **sans erreur ni avertissement dans notre code** :
+  - projet en fichiers texte (`unreal/Eudoria.uproject`, cibles, module `Eudoria`, plugin `EudoriaCore`,
+    `Config/*.ini`, carte vide du moteur `/Engine/Maps/Entry`) → **aucun `.uasset`** ;
+  - socle : réglages (`CoreBaseUrl=https://localhost:5443/v1`, refus de tout sauf `https://`), lecture pure des
+    réponses du contrat, messages en français, transport HTTP remplaçable, session en mémoire avec **renouvellement
+    unique** (§ 10.1 du plan) ;
+  - front-end : écrans « Se connecter », « Créer un compte » (connexion automatique, message neutre), « Bienvenue »,
+    construits en C++ (UMG) ; mode de jeu et contrôleur ;
+  - **pas encore lancé** (ni éditeur, ni client) et **pas encore de tests Unreal** (commit 6, après T3) ;
+  - première compilation : 91 s, 12 actions. Le journal d'UBT n'affiche pas le nombre de tâches parallèles :
+    confirmation de `MaxParallelActions` = 6 toujours en attente (à voir sur une compilation plus grosse) ;
+  - **cache de l'UBA redirigé vers E:** (règle « tout sur E: ») : il allait dans
+    `C:\ProgramData\Epic\UnrealBuildAccelerator` (jusqu'à 40 Go). `BuildConfiguration.xml` :
+    `UnrealBuildAccelerator/RootDir = E:\Dev\UnrealCache\UBA` (réglage lu dans le code d'UBT 5.8, fichier validé contre
+    le schéma, vérifié à la compilation suivante). Le dossier de C: reste, vide (0 Mo) : supprimable.
   Vérifications faites pour le plan :
   - `LauncherInstalled.dat` liste désormais UE 5.8.4 (`E:\Epic Games\UE_5.8`) → problème résolu ; reste le
     contrôle visuel dans la Bibliothèque du lanceur (action T1 du plan) ;
@@ -163,6 +179,9 @@
 - **Disque C:** ~71 Go libres ; il descend temporairement pendant les installations.
 - ~~`LauncherInstalled.dat` ne liste pas encore UE 5.8~~ : résolu (vérifié le 2026-11-24) ; contrôle visuel dans la
   Bibliothèque du lanceur à faire par le porteur (T1 du plan 1.5).
+- **Compilateur MSVC 14.52** « plus récent que la version préférée » d'UE 5.8 (14.50) : UBT l'accepte avec un
+  avertissement, et signale un avertissement C4864 dans un en-tête **du moteur** (`Misc/Attribute.h`), pas dans notre
+  code. Rien à faire tant que ça compile ; installer MSVC 14.50 serait une installation (accord du porteur requis).
 - Plugin Fab 5.8 enregistré par le lanceur dans un dossier inexistant (`C:\Program Files\Epic Games\UE_5.8`) : à
   réinstaller sur le moteur de E: avant la 1.7.
 - La limite mémoire WSL (4 Go) s'applique aussi à la distribution Ubuntu déjà présente sur le PC.
@@ -173,7 +192,9 @@
 - **ROADMAP :** critères de l'étape 1 remplis par 1.1 à 1.4 cochés le 2026-11-24 (5 sur 11 ; « tests » et « lancement
   local » remplis pour le noyau, en attente du client Unreal).
 
-1. **Claude : commit 3 du plan 1.5** — fichiers texte du projet Unreal (`unreal/Eudoria.uproject`, cibles, `Build.cs`,
-   plugin `EudoriaCore`, `Config/*.ini`), puis génération des fichiers de projet et première compilation éditeur fermé
-   (§ 7, points 2 et 3 de « Ce que je ferai ») ; relever dans le journal d'UBT le nombre de tâches parallèles.
-2. Ensuite : T3 par le porteur (premier lancement de l'éditeur, shaders).
+1. **Porteur : T3** — premier lancement de l'éditeur (double-clic sur `unreal/Eudoria.uproject`), programmes lourds
+   fermés, attendre la fin des shaders ; « reconstruire les modules ? » → **Non** et prévenir Claude ; puis fermer.
+   Rapporter : durée, fenêtres ou messages vus, ralentissements du PC.
+2. Puis Claude : lire le journal de l'éditeur (`unreal/Saved/Logs/Eudoria.log` : ligne `Found local data cache path=`
+   sur E:, erreurs) ; commit 6 (tests d'automatisation, dont « deux 401 → un seul renouvellement », + script « aucune
+   logique Blueprint ») ; commit 7 (`run-client.ps1`, `test-unreal.ps1`) ; lancement réel du client ; puis T4.
