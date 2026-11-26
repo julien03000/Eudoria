@@ -1,6 +1,6 @@
 # Étape 1.6 — Vérification de l'identité par un service tiers : le ticket d'entrée des mondes
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-26 (6 recommandations du § 13) — **partie A réalisée** (§ 18), en attente du contrôle du porteur ; partie B à faire
+- **Statut :** ✅ Plan validé le 2026-11-26 — partie A ✅ validée par le porteur (ADR-0007 « Accepté ») ; **partie B réalisée** (§ 19), en attente du contrôle du porteur
 - **Date :** 2026-11-25
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.6 **uniquement** : le noyau délivre un **ticket d'entrée** propre à un monde, publie
@@ -411,3 +411,41 @@ Résultats :
    des clés au lieu d'être ignorée.
 8. **Incident d'environnement** : Docker Desktop figé en mode économie de ressources (le moteur ne répondait plus) ;
    arrêté puis relancé par Claude, puis tout a fonctionné. Aucune donnée touchée.
+
+## 19. Partie B — réalisation et écarts (2026-11-26)
+
+**Validation de la partie A par le porteur (2026-11-26)** : ADR-0007 passé à « Accepté », `CLAUDE.md` (Stack technique)
+et `ARCHITECTURE.md` mis à jour. **Partie B réalisée** (commits 10 à 14 du § 17) ; **en attente du contrôle du porteur**.
+
+Résultats :
+- **Unreal : 38 tests réussis** (`test-unreal.ps1`, noyau lancé, aucun ignoré), dont 16 nouveaux : `Eudoria.EntryTickets.*`
+  (base64url, UTF-8 et JSON stricts, ES256 sur l'OpenSSL du moteur, **50 jeux d'essai partagés : mêmes verdicts qu'en
+  .NET**, usage unique, mémoire anti-rejeu, téléchargements de clés limités, absence de clés, JWKS, ticket jamais
+  journalisé), `Eudoria.Core.EntryTicketRequest.*` (ticket, renouvellement unique sur 401, erreurs, rien dans les
+  journaux) et le **bout en bout** `Eudoria.Integration.EntryTicketVerifiedByTheWorld` (client connecté → ticket
+  `sandbox` → clés téléchargées en HTTPS → accepté hors ligne, **même UUID que `/me`** → rejeu refusé → autre monde refusé).
+- Compilation sans avertissement dans notre code ; journal du noyau pendant le bout en bout : 0 `fail`/`warn`, 2 tickets
+  délivrés, aucun ticket ni jeton.
+- **Tests de mutation C++, tous détectés** : r et s inversés dans la conversion de signature (5 tests, 23 jeux
+  d'essai) ; contrôle du `typ` retiré (4 jeux d'essai) ; mémoire anti-rejeu neutralisée (2 tests).
+- **Noyau .NET : 364 tests passent** (7 de plus, voir l'écart 1).
+
+Écarts par rapport au plan :
+1. **Deux défauts de la partie A trouvés et corrigés** en préparant le C++ (commit `fix(core)` séparé) : le vérificateur
+   .NET plantait (exception non attrapée) au lieu de refuser un ticket dont le dernier caractère base64url est
+   « non canonique » (`FormatException`), ou dont le JSON n'est pas de l'UTF-8 valide (`InvalidOperationException`).
+   Défaut prouvé (3 tests échouent sans la correction), corrigé (`ticket_malformed`), et **3 jeux d'essai ajoutés**
+   (50 au total, régénérés avant l'écriture du C++).
+2. **Noms et fichiers** : la session est `FEudoriaSession` (et non `UEudoriaSession`) ; le vérificateur est exposé dans un
+   seul en-tête public `EudoriaEntryTickets.h` ; la mémoire anti-rejeu, le magasin de clés et le vérificateur partagent
+   `EudoriaWorldTicketVerifier.cpp` ; le « client JWKS » s'appelle `FEudoriaTicketKeyStore`.
+3. **Condition de compilation** : `Target.bWithServerCode` + Win64/Linux (`EUDORIA_WITH_TICKET_VERIFIER`). Notre cible
+   de jeu actuelle (type « Game ») contient du code serveur, donc le vérificateur y est compilé ; il disparaîtra
+   automatiquement d'une future cible « Client ».
+4. **Vérification asynchrone** : `Verify` rend son verdict par rappel — tout de suite dans le cas normal, après
+   téléchargement si les clés sont vieilles ou si le `kid` est inconnu (même comportement que le vérificateur .NET).
+5. **Aide de tests partagée** : le faux transport et la capture des journaux sont sortis de `EudoriaSessionTests.cpp`
+   vers `EudoriaTestSupport.h` (aucun changement de comportement ; tests de session toujours verts).
+6. **Limites connues** (hors jeux d'essai) : les lecteurs JSON d'Unreal et de .NET peuvent différer sur des formes
+   exotiques (zéros en tête, espaces après l'objet) ; le document de clés est lu comme texte par le transport d'Unreal.
+   Sans effet sur les tickets du noyau ; à surveiller si de nouveaux cas sont ajoutés aux jeux d'essai.

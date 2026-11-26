@@ -319,7 +319,7 @@ core/
   sont dans les journaux du serveur seulement.
 - **Tests :** xUnit v3 ; base PostgreSQL réelle et jetable créée dans Docker à chaque série de tests, migrations appliquées.
 
-## 9. Le client Unreal aujourd'hui (étape 1.5)
+## 9. Le client Unreal aujourd'hui (étape 1.6 B)
 
 Projet écrit en fichiers texte (aucun assistant de l'éditeur), **sans aucun fichier binaire** pour l'instant :
 la carte de démarrage est la carte vide du moteur (`/Engine/Maps/Entry`).
@@ -350,8 +350,14 @@ unreal/
         ├── EudoriaCoreApi               # lecture PURE des réponses du contrat core-v1 + messages en français
         ├── EudoriaHttpTransport         # interface d'envoi + version réelle (module HTTP d'Unreal) ; refuse tout sauf https://
         ├── EudoriaSession               # jetons EN MÉMOIRE seulement ; renouvellement unique (ci-dessous)
+        ├── EudoriaSession::RequestEntryTicket  # demande d'un ticket d'entrée de monde (ADR-0007), en mémoire seulement
         ├── EudoriaSessionSubsystem      # sous-système de l'instance de jeu : possède la session
-        └── Private/Tests/               # tests d'automatisation (catégorie Eudoria.*)
+        ├── EudoriaEntryTickets.h        # vérificateur de tickets pour le SERVEUR de monde (étape 3) : règles, mémoire
+        │                                # anti-rejeu, magasin de clés (JWKS), vérificateur — si EUDORIA_WITH_TICKET_VERIFIER
+        ├── Private/EntryTickets/        # base64url / UTF-8 / JSON stricts (EudoriaJwt), ES256 sur l'OpenSSL du moteur
+        │                                # (EudoriaEs256), règles, mémoire, clés, vérificateur
+        └── Private/Tests/               # tests d'automatisation (catégorie Eudoria.*) ; EudoriaTestSupport.h (faux transport,
+                                         # capture des journaux) ; EudoriaTicketTestVectors.h (jeux d'essai partagés)
 ```
 
 - **HTTPS :** le client refuse d'envoyer quoi que ce soit si l'adresse n'est pas en `https://`. Le certificat du noyau est
@@ -363,6 +369,19 @@ unreal/
   nouveau jeton. Une requête partie avec un jeton déjà remplacé est rejouée sans nouveau renouvellement. Échec du
   renouvellement, ou 401 sur une requête déjà rejouée → session terminée, retour à « Se connecter ». Raison : le noyau
   traite un second usage du même jeton de renouvellement comme un vol et coupe toute la session (étape 1.3).
+- **Tickets d'entrée — côté client :** `FEudoriaSession::RequestEntryTicket(WorldId)` → `POST /worlds/{id}/entry-tickets`,
+  avec le renouvellement unique ci-dessus. Un identifiant de monde mal formé est refusé **sans rien envoyer** (aucune
+  valeur non vérifiée dans une adresse). 404 → erreur `NotFound` (« Ce monde n'existe pas (ou plus). »). Le ticket reste
+  en mémoire, sert une fois, n'est jamais journalisé (testé).
+- **Tickets d'entrée — vérificateur du serveur de monde (ADR-0007) :** compilé seulement avec le code serveur
+  (`Target.bWithServerCode`, Win64/Linux : éditeur et futur serveur dédié ; pas dans une future cible « Client »), avec
+  l'**OpenSSL 1.1.1t du moteur** (aucune nouvelle librairie ; clés publiques seulement). Mêmes règles, même ordre et mêmes
+  codes de refus que le vérificateur .NET de référence : les **50 jeux d'essai partagés** donnent les mêmes verdicts.
+  `FEudoriaTicketKeyStore` télécharge les clés au démarrage, à 5 min, ou pour un `kid` inconnu (au plus une fois par
+  minute) et garde les clés connues si le noyau est injoignable ; `FEudoriaReplayCache` retient les `jti` (100 000 au
+  plus) jusqu'à `exp` + 15 s ; `FEudoriaWorldTicketVerifier::Verify` rend le verdict (tout de suite, sauf
+  téléchargement de clés) : l'UUID du compte ou le code de refus. Les journaux ne contiennent que le verdict. Reste à
+  faire à l'étape 3 : le brancher dans la porte d'entrée du serveur dédié (`PreLogin`) et choisir le transport du ticket.
 - **Tests :** `tools/dev/test-unreal.ps1` (sans fenêtre, ~20 s) — lecture des réponses, messages, refus de `http://`,
   session avec un faux transport (dont « deux 401 simultanés → un seul renouvellement »), absence de secrets dans les
   journaux, tests d'intégration contre le noyau lancé (ignorés avec un avertissement s'il ne répond pas), et

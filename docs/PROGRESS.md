@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-26 (1.6 partie A réalisée, en attente du contrôle du porteur)
+**Dernière mise à jour :** 2026-11-26 (1.6 partie B réalisée, en attente du contrôle du porteur)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,9 +35,15 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
-- **Sous-étape 1.6 — partie A (noyau) réalisée le 2026-11-26, ⏸️ en attente du contrôle du porteur** (détail et
+- **Sous-étape 1.6 — partie B (C++) réalisée le 2026-11-26, ⏸️ en attente du contrôle du porteur** (détail et écarts :
+  `docs/plans/etape-01-6.md` § 19) : vérificateur de tickets C++ dans `EudoriaCore` (OpenSSL du moteur, code serveur
+  seulement), **mêmes verdicts que le .NET sur les 50 jeux d'essai partagés** ; `FEudoriaSession::RequestEntryTicket` ;
+  bout en bout Unreal ↔ noyau réussi (même UUID que `/me`) ; **38 tests Unreal** et **364 tests .NET** passent ;
+  3 mutations C++ détectées. Deux défauts du vérificateur .NET de la partie A (exceptions non attrapées : base64url non
+  canonique, UTF-8 invalide) trouvés, prouvés et corrigés.
+- **Partie A ✅ validée par le porteur le 2026-11-26 ; ADR-0007 « Accepté »** (`CLAUDE.md` à jour). Partie A (détail et
   écarts : `docs/plans/etape-01-6.md` § 18) :
-  - **ADR-0007** « Ticket d'entrée des mondes » rédigé, statut **« Proposé »** → à valider par le porteur ;
+  - **ADR-0007** « Ticket d'entrée des mondes » rédigé (« Accepté » le 2026-11-26) ;
   - contrat core-v1 **1.4.0** : `POST /v1/worlds/{worldId}/entry-tickets` (200 / 400 `world_id_invalid` / 401 /
     404 `world_unknown` / 429) et `GET /v1/entry-tickets/keys` (JWK Set public, cache 5 min) ; format du ticket et règles
     de vérification décrits dans le contrat (tag `worlds`) ;
@@ -246,8 +252,9 @@
 - *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
   reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Porteur : contrôler la partie A de la 1.6** — relire et valider (ou faire corriger) l'**ADR-0007**
-   (`docs/decisions/0007-ticket-entree-mondes.md`) et le § 18 du plan (écarts). Rien à lancer à la main.
-2. **Claude, après ce contrôle : partie B de la 1.6** (commits 10 à 14 du § 17) : vérificateur C++ dans `EudoriaCore`
-   (OpenSSL du moteur, `WITH_SERVER_CODE`), qui doit passer les 47 jeux d'essai partagés ; demande de ticket par
-   `UEudoriaSession` ; test de bout en bout Unreal contre le noyau. Passer l'ADR-0007 à « Accepté » si le porteur le valide.
+1. **Porteur : contrôler la partie B de la 1.6** — relire le § 19 du plan (résultats et écarts, dont les deux défauts
+   .NET corrigés) ; rien à lancer à la main. Sa validation clôt la sous-étape 1.6.
+2. **Claude, après cette validation : sous-étape 1.7 — Test de rendu** (ROADMAP) : commencer par **un plan** (scène après
+   connexion, troisième personne en C++, Lumen + Nanite, assets Fab gratuits, mesures notées dans `docs/`, validation de
+   l'ADR-0003) à soumettre au porteur. Prérequis connu : réinstaller le plugin Fab sur le moteur de E: (voir « Problèmes
+   connus »).
