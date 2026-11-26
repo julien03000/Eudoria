@@ -1,6 +1,6 @@
 # Étape 1.6 — Vérification de l'identité par un service tiers : le ticket d'entrée des mondes
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-26 (6 recommandations du § 13) — réalisation à lancer (aucun code écrit)
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-26 (6 recommandations du § 13) — partie A en cours
 - **Date :** 2026-11-25
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.6 **uniquement** : le noyau délivre un **ticket d'entrée** propre à un monde, publie
