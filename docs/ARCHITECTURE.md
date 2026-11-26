@@ -1,7 +1,7 @@
 # EUDORIA — Architecture globale
 
 > Statut : **révision 5 (étape 1.6 A, 2026-11-26)**. Vue d'ensemble, plus l'état réel du code en sections 8 et 9.
-> Les choix de technologies sont traités dans `docs/decisions/` (ADR 0001 à 0006 « Accepté » ; ADR-0007 « Proposé »).
+> Les choix de technologies sont traités dans `docs/decisions/` (ADR 0001 à 0007 au statut « Accepté »).
 > Hypothèses actuelles : client et serveurs de monde sous **Unreal Engine 5** (ADR-0003, ADR-0004),
 > noyau en **C#/.NET** (ADR-0001), base **PostgreSQL** (ADR-0002).
 

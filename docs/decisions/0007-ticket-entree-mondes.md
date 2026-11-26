@@ -1,6 +1,6 @@
 # ADR-0007 — Ticket d'entrée des mondes
 
-- **Statut :** Proposé (à valider par le porteur avec la partie A de la sous-étape 1.6)
+- **Statut :** Accepté (validé par le porteur le 2026-11-26, avec la partie A de la sous-étape 1.6)
 - **Date :** 2026-11-26
 - **Liée à :** ADR-0001 (noyau, contrats OpenAPI), ADR-0004 (mondes = serveurs dédiés Unreal) ;
   plan `docs/plans/etape-01-6.md` (décisions du porteur du 2026-11-26)

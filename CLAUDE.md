@@ -82,6 +82,10 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
 - **Fichiers binaires** : **Git LFS** avec verrouillage (`.uasset`, `.umap` verrouillables) — ADR-0005.
 - **Hébergement du dépôt distant** : **GitHub, dépôt privé** `julien03000/Eudoria`
   (https://github.com/julien03000/Eudoria), remote `origin`, en HTTPS — ADR-0006.
+- **Entrée dans les mondes** (validé le 2026-11-26) : un monde ne reçoit **jamais** le jeton d'accès du noyau, mais un
+  **ticket d'entrée** (JWT ES256, `typ: eudoria-entry+jwt`, audience `eudoria-world:<id>`, 60 s, usage unique) signé
+  par une **clé distincte** dont la partie publique est publiée en JWKS ; le monde le vérifie **seul, par sa signature**,
+  sans appeler le noyau. Le jeton d'accès (`typ: eudoria-access+jwt`) n'est accepté que par le noyau — ADR-0007.
 
 ## Environnement
 - **Règle d'installation : tout sur E:.** Le disque C: n'a qu'environ 50 Go libres ; seuls les composants
