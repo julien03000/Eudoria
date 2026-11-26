@@ -82,7 +82,13 @@ Add("four-parts", Ticket() + ".AAAA", iat, "ticket_malformed", "One part too man
 Add("base64-padding", Replace(Ticket(), 2, Convert.ToBase64String(Base64Url.DecodeFromChars(Part(Ticket(), 2))).Replace('+', '-').Replace('/', '_')), iat,
     "ticket_malformed", "Padding '=' is not allowed.");
 Add("base64-standard-alphabet", StandardAlphabetSignature(), iat, "ticket_malformed", "'+' and '/' are not Base64 URL-safe.");
-Add("payload-not-json", Sign(Header().ToJsonString(), "not json"), iat, "ticket_malformed", "Signed, but not JSON.");
+Add("base64-non-canonical", Replace(Ticket(), 2, NonCanonical(Part(Ticket(), 2))), iat, "ticket_malformed",
+    "Last character with non-zero unused bits: decodes to the same bytes, but only one encoding is accepted.");
+Add("payload-invalid-utf8", SignBytes(Encoding.UTF8.GetBytes(Header().ToJsonString()), InvalidUtf8In(Claims().ToJsonString())), iat,
+    "ticket_malformed", "Signed, but the payload is not valid UTF-8 (0xC3 0x28 in a member name).");
+Add("header-invalid-utf8", SignBytes(InvalidUtf8In(Header().ToJsonString()), Encoding.UTF8.GetBytes(Claims().ToJsonString())), iat,
+    "ticket_malformed", "Signed, but the header is not valid UTF-8.");
+Add("payload-not-json",Sign(Header().ToJsonString(), "not json"), iat, "ticket_malformed", "Signed, but not JSON.");
 Add("payload-array", Sign(Header().ToJsonString(), "[1,2]"), iat, "ticket_malformed", "Signed, but not a JSON object.");
 Add("too-long", Ticket(claims: c => c["pad"] = new string('a', 4000)), iat, "ticket_malformed", "More than 4096 characters.");
 
@@ -169,6 +175,28 @@ string Sign(string headerJson, string payloadJson, ECDsa? signer = null)
     string signingInput = Encode(headerJson) + "." + Encode(payloadJson);
     byte[] signature = (signer ?? key).SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
     return signingInput + "." + Base64Url.EncodeToString(signature);
+}
+
+string SignBytes(byte[] header, byte[] payload)
+{
+    string signingInput = Base64Url.EncodeToString(header) + "." + Base64Url.EncodeToString(payload);
+    byte[] signature = key.SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+    return signingInput + "." + Base64Url.EncodeToString(signature);
+}
+
+// The same bytes, last character with its unused low bits set.
+static string NonCanonical(string part)
+{
+    const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    return part[..^1] + Alphabet[Alphabet.IndexOf(part[^1], StringComparison.Ordinal) | 1];
+}
+
+// UTF-8 of the JSON text with 0xC3 0x28 (not UTF-8) at the start of the first member name.
+static byte[] InvalidUtf8In(string json)
+{
+    byte[] bytes = Encoding.UTF8.GetBytes(json.Insert(2, "ÿ"));
+    bytes[3] = 0x28;
+    return bytes;
 }
 
 static string Encode(string json) => Base64Url.EncodeToString(Encoding.UTF8.GetBytes(json));

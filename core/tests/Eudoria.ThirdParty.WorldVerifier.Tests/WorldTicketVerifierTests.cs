@@ -59,6 +59,9 @@ public sealed class WorldTicketVerifierTests : IDisposable
         { "two-parts", TicketRejections.Malformed },
         { "base64-padding", TicketRejections.Malformed },
         { "not-json", TicketRejections.Malformed },
+        { "base64-non-canonical", TicketRejections.Malformed },
+        { "payload-invalid-utf8", TicketRejections.Malformed },
+        { "header-invalid-utf8", TicketRejections.Malformed },
         { "sub-not-uuid", TicketRejections.ClaimsInvalid },
         { "sub-upper-case", TicketRejections.ClaimsInvalid },
         { "jti-missing", TicketRejections.ClaimsInvalid },
@@ -99,6 +102,9 @@ public sealed class WorldTicketVerifierTests : IDisposable
             "two-parts" => string.Join('.', valid.Split('.')[..2]),
             "base64-padding" => ReplacePart(valid, 2, Convert.ToBase64String(Base64Url.DecodeFromChars(valid.Split('.')[2])).Replace('+', '-').Replace('/', '_') + "=="),
             "not-json" => _minter.Sign(_minter.Header().ToJsonString(), "not json"),
+            "base64-non-canonical" => ReplacePart(valid, 2, NonCanonical(valid.Split('.')[2])),
+            "payload-invalid-utf8" => _minter.SignBytes(Encoding.UTF8.GetBytes(_minter.Header().ToJsonString()), InvalidUtf8In(_minter.Claims().ToJsonString())),
+            "header-invalid-utf8" => _minter.SignBytes(InvalidUtf8In(_minter.Header().ToJsonString()), Encoding.UTF8.GetBytes(_minter.Claims().ToJsonString())),
             "sub-not-uuid" => _minter.Mint(claims: c => c["sub"] = "ana"),
             "sub-upper-case" => _minter.Mint(claims: c => c["sub"] = _minter.AccountId.ToString().ToUpperInvariant()),
             "jti-missing" => _minter.Mint(claims: c => c.Remove("jti")),
@@ -286,6 +292,14 @@ public sealed class WorldTicketVerifierTests : IDisposable
         Assert.Equal([_minter.KeyId], keys!.Keys);
     }
 
+    [Fact]
+    public void UnreadableJwkSet_IsRefusedAsAWhole_WithoutThrowing()
+    {
+        Assert.Null(EntryTicketKeyStore.ParseJwkSet(InvalidUtf8In(_minter.JwkSet())));
+        Assert.Null(EntryTicketKeyStore.ParseJwkSet(Encoding.UTF8.GetBytes("""{"keys":[],"keys":[]}""")));
+        Assert.Null(EntryTicketKeyStore.ParseJwkSet(Encoding.UTF8.GetBytes("not json")));
+    }
+
     // ---------- Independence from the core ----------
 
     [Fact]
@@ -331,6 +345,22 @@ public sealed class WorldTicketVerifierTests : IDisposable
     {
         string signingInput = ticket[..ticket.LastIndexOf('.')];
         return _minter.Key.SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+    }
+
+    /// <summary>The same bytes with a different last character: its unused low bits set (decodes alike, not canonical).</summary>
+    internal static string NonCanonical(string part)
+    {
+        const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        int last = Alphabet.IndexOf(part[^1], StringComparison.Ordinal);
+        return part[..^1] + Alphabet[last | 1];
+    }
+
+    /// <summary>The JSON text as UTF-8, with an invalid sequence (0xC3 0x28) at the start of the first member name.</summary>
+    internal static byte[] InvalidUtf8In(string json)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(json.Insert(2, "ÿ")); // {"ÿ...: 0xC3 0xBF
+        bytes[3] = 0x28; // 0xC3 0x28: not UTF-8
+        return bytes;
     }
 
     /// <summary>The classic "algorithm confusion": HS256 with the public key as the HMAC secret.</summary>

@@ -79,6 +79,14 @@ internal sealed class TicketMinter : IDisposable
         return signingInput + "." + Base64Url.EncodeToString(signature);
     }
 
+    /// <summary>Signs raw header and payload bytes (to write invalid UTF-8).</summary>
+    public string SignBytes(byte[] header, byte[] payload)
+    {
+        string signingInput = Base64Url.EncodeToString(header) + "." + Base64Url.EncodeToString(payload);
+        byte[] signature = Key.SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        return signingInput + "." + Base64Url.EncodeToString(signature);
+    }
+
     public static string Encode(string json) => Base64Url.EncodeToString(Encoding.UTF8.GetBytes(json));
 
     public IReadOnlyDictionary<string, ECParameters> Keys() =>

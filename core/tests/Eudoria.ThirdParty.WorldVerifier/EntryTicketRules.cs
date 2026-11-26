@@ -2,6 +2,7 @@ using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace Eudoria.ThirdParty.WorldVerifier;
 
@@ -188,7 +189,10 @@ public static class EntryTicketRules
         return TryDecode(parts[0], out header) && TryDecode(parts[1], out payload) && TryDecode(parts[2], out signature);
     }
 
-    /// <summary>Strict Base64 URL-safe decoding: only A-Z a-z 0-9 - _, no padding, no whitespace.</summary>
+    /// <summary>
+    /// Strict Base64 URL-safe decoding: only A-Z a-z 0-9 - _, no padding, no whitespace, and the unused
+    /// bits of the last character must be zero (one encoding per value: "QR" is refused, "QQ" is not).
+    /// </summary>
     public static bool TryDecode(string text, out byte[] bytes)
     {
         bytes = [];
@@ -197,12 +201,26 @@ public static class EntryTicketRules
             return false;
         }
 
-        bytes = Base64Url.DecodeFromChars(text);
-        return true;
+        try
+        {
+            bytes = Base64Url.DecodeFromChars(text);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false; // non-zero unused bits in the last character
+        }
     }
 
-    private static JsonDocument? TryParseObject(byte[] json)
+    /// <summary>A JSON object, read strictly: valid UTF-8, no duplicate member. Null otherwise.</summary>
+    internal static JsonDocument? TryParseObject(byte[] json)
     {
+        // Checked first: with invalid UTF-8, reading a name or a string throws InvalidOperationException.
+        if (!Utf8.IsValid(json))
+        {
+            return null;
+        }
+
         try
         {
             JsonDocument document = JsonDocument.Parse(json, StrictJson);

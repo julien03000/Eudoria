@@ -112,30 +112,24 @@ public sealed class EntryTicketKeyStore(HttpClient http, Uri keysUrl, TimeProvid
     /// </summary>
     public static Dictionary<string, ECParameters>? ParseJwkSet(byte[] json)
     {
-        try
-        {
-            using JsonDocument document = JsonDocument.Parse(json, new JsonDocumentOptions { AllowDuplicateProperties = false, MaxDepth = 4 });
-            if (document.RootElement.ValueKind != JsonValueKind.Object
-                || !document.RootElement.TryGetProperty("keys", out JsonElement list) || list.ValueKind != JsonValueKind.Array)
-            {
-                return null;
-            }
-
-            Dictionary<string, ECParameters> keys = new(StringComparer.Ordinal);
-            foreach (JsonElement jwk in list.EnumerateArray())
-            {
-                if (TryReadKey(jwk, out string? keyId, out ECParameters key))
-                {
-                    keys.TryAdd(keyId!, key); // a repeated kid keeps its first key
-                }
-            }
-
-            return keys;
-        }
-        catch (JsonException)
+        // Same strict reading as the tickets: valid UTF-8, no duplicate member, a JSON object.
+        using JsonDocument? document = EntryTicketRules.TryParseObject(json);
+        if (document is null
+            || !document.RootElement.TryGetProperty("keys", out JsonElement list) || list.ValueKind != JsonValueKind.Array)
         {
             return null;
         }
+
+        Dictionary<string, ECParameters> keys = new(StringComparer.Ordinal);
+        foreach (JsonElement jwk in list.EnumerateArray())
+        {
+            if (TryReadKey(jwk, out string? keyId, out ECParameters key))
+            {
+                keys.TryAdd(keyId!, key); // a repeated kid keeps its first key
+            }
+        }
+
+        return keys;
     }
 
     private static bool TryReadKey(JsonElement jwk, out string? keyId, out ECParameters key)
