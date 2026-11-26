@@ -97,6 +97,8 @@ namespace
 			{TEXT("password_unchanged"), LOCTEXT("PasswordUnchanged", "Le nouveau mot de passe doit être différent de l'ancien.")},
 			{TEXT("invalid_credentials"), LOCTEXT("InvalidCredentials", "E-mail ou mot de passe incorrect.")},
 			{TEXT("refresh_token_invalid"), LOCTEXT("RefreshTokenInvalid", "Ta session a expiré. Reconnecte-toi.")},
+			{TEXT("world_unknown"), LOCTEXT("WorldUnknown", "Ce monde n'existe pas (ou plus).")},
+			{TEXT("world_id_invalid"), LOCTEXT("WorldIdInvalid", "Identifiant de monde invalide.")},
 		};
 		for (const FEntry& Entry : Entries)
 		{
@@ -156,6 +158,7 @@ namespace EudoriaCoreApi
 		{
 		case 400: Kind = EEudoriaApiErrorKind::InvalidInput; break;
 		case 401: Kind = EEudoriaApiErrorKind::Unauthorized; break;
+		case 404: Kind = EEudoriaApiErrorKind::NotFound; break;
 		case 409: Kind = EEudoriaApiErrorKind::Conflict; break;
 		case 429: Kind = EEudoriaApiErrorKind::TooManyRequests; break;
 		case 503: Kind = EEudoriaApiErrorKind::ServerBusy; break;
@@ -239,6 +242,41 @@ namespace EudoriaCoreApi
 		return MakeValue(MoveTemp(Profile));
 	}
 
+	bool IsValidWorldId(const FString& WorldId)
+	{
+		if (WorldId.IsEmpty() || WorldId.Len() > 64 || WorldId.StartsWith(TEXT("-")) || WorldId.EndsWith(TEXT("-")))
+		{
+			return false;
+		}
+		for (const TCHAR Character : WorldId)
+		{
+			const bool bAllowed = (Character >= TEXT('a') && Character <= TEXT('z')) || (Character >= TEXT('0') && Character <= TEXT('9')) || Character == TEXT('-');
+			if (!bAllowed)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	TValueOrError<FEudoriaEntryTicket, FEudoriaApiError> ParseEntryTicket(const FEudoriaHttpResponse& Response)
+	{
+		if (Response.TransportStatus != EEudoriaTransportStatus::Received || Response.StatusCode != 200)
+		{
+			return MakeError(ParseError(Response));
+		}
+
+		const TSharedPtr<FJsonObject> Object = ParseJsonObject(Response.Body);
+		FEudoriaEntryTicket Ticket;
+		if (!Object.IsValid() ||
+			!TryGetNonEmptyString(*Object, TEXT("ticket"), Ticket.Ticket) ||
+			!Object->TryGetNumberField(TEXT("expiresIn"), Ticket.ExpiresInSeconds) || Ticket.ExpiresInSeconds <= 0)
+		{
+			return MakeError(MakeApiError(EEudoriaApiErrorKind::UnexpectedResponse, Response.StatusCode));
+		}
+		return MakeValue(MoveTemp(Ticket));
+	}
+
 	FEudoriaApiStatus ParseLogout(const FEudoriaHttpResponse& Response)
 	{
 		if (Response.TransportStatus == EEudoriaTransportStatus::Received && Response.StatusCode == 204)
@@ -290,6 +328,7 @@ namespace EudoriaCoreApi
 			return LOCTEXT("UnexpectedResponse", "Réponse inattendue du serveur EUDORIA. Réessaie plus tard.");
 		case EEudoriaApiErrorKind::InvalidInput:
 		case EEudoriaApiErrorKind::Unauthorized:
+		case EEudoriaApiErrorKind::NotFound:
 		case EEudoriaApiErrorKind::Conflict:
 			break;
 		}

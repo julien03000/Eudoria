@@ -50,6 +50,8 @@ enum class EEudoriaApiErrorKind : uint8
 	InvalidInput,
 	/** 401: wrong credentials or invalid token; see Errors. */
 	Unauthorized,
+	/** 404: unknown resource (world_unknown); see Errors. */
+	NotFound,
 	/** 409: conflict (pseudo taken); see Errors. */
 	Conflict,
 	/** 429: too many attempts; see RetryAfterSeconds. */
@@ -90,6 +92,13 @@ struct FEudoriaTokenPair
 	int32 RefreshExpiresInSeconds = 0;
 };
 
+/** An entry ticket for one world (POST /worlds/{worldId}/entry-tickets). Memory only: never logged, never on disk, used once. */
+struct FEudoriaEntryTicket
+{
+	FString Ticket;
+	int32 ExpiresInSeconds = 0;
+};
+
 /** The player's own profile (GET /me). */
 struct FEudoriaProfile
 {
@@ -114,6 +123,12 @@ namespace EudoriaCoreApi
 
 	/** GET /me: 200 with the profile. */
 	EUDORIACORE_API TValueOrError<FEudoriaProfile, FEudoriaApiError> ParseProfile(const FEudoriaHttpResponse& Response);
+
+	/** World identifier format of the contract: 1 to 64 of a-z, 0-9 and '-', not starting or ending with '-'. */
+	EUDORIACORE_API bool IsValidWorldId(const FString& WorldId);
+
+	/** POST /worlds/{worldId}/entry-tickets: 200 with the ticket. */
+	EUDORIACORE_API TValueOrError<FEudoriaEntryTicket, FEudoriaApiError> ParseEntryTicket(const FEudoriaHttpResponse& Response);
 
 	/** POST /auth/logout: 204 = success. */
 	EUDORIACORE_API FEudoriaApiStatus ParseLogout(const FEudoriaHttpResponse& Response);

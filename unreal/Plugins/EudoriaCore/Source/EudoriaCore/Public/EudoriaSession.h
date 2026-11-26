@@ -31,6 +31,15 @@ public:
 	/** GET /me, renewing the access token if needed. SessionEnded error: the player must log in again. */
 	void FetchProfile(FProfileCallback OnComplete);
 
+	using FEntryTicketCallback = TFunction<void(const TValueOrError<FEudoriaEntryTicket, FEudoriaApiError>&)>;
+
+	/**
+	 * POST /worlds/{WorldId}/entry-tickets (ADR-0007), renewing the access token if needed. Ask for it just
+	 * before joining the world, use it once, keep it in memory only. A malformed WorldId is refused here
+	 * (InvalidInput, world_id_invalid) without calling the core. SessionEnded: the player must log in again.
+	 */
+	void RequestEntryTicket(const FString& WorldId, FEntryTicketCallback OnComplete);
+
 	/** Forgets the tokens at once, then asks the core to close the session (POST /auth/logout). */
 	void Logout(FStatusCallback OnComplete);
 

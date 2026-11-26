@@ -65,6 +65,35 @@ void FEudoriaSession::FetchProfile(FProfileCallback OnComplete)
 	});
 }
 
+void FEudoriaSession::RequestEntryTicket(const FString& WorldId, FEntryTicketCallback OnComplete)
+{
+	using FResult = TValueOrError<FEudoriaEntryTicket, FEudoriaApiError>;
+	if (!EudoriaCoreApi::IsValidWorldId(WorldId))
+	{
+		// Never put an unchecked value in a URL path.
+		FEudoriaApiError Error;
+		Error.Kind = EEudoriaApiErrorKind::InvalidInput;
+		Error.Errors.Add(FEudoriaFieldError{TEXT("worldId"), TEXT("world_id_invalid")});
+		OnComplete(FResult(MakeError(MoveTemp(Error))));
+		return;
+	}
+
+	FEudoriaHttpRequest Request{TEXT("POST"), FString::Printf(TEXT("/worlds/%s/entry-tickets"), *WorldId)};
+	SendAuthorized(MoveTemp(Request), [OnComplete = MoveTemp(OnComplete)](const FEudoriaHttpResponse& Response)
+	{
+		FResult Result = EudoriaCoreApi::ParseEntryTicket(Response);
+		if (Result.HasError() && Result.GetError().Kind == EEudoriaApiErrorKind::Unauthorized)
+		{
+			// A 401 that reaches this point survived the renewal rules: the session is over.
+			FEudoriaApiError Error = Result.StealError();
+			Error.Kind = EEudoriaApiErrorKind::SessionEnded;
+			OnComplete(FResult(MakeError(MoveTemp(Error))));
+			return;
+		}
+		OnComplete(Result);
+	});
+}
+
 void FEudoriaSession::Logout(FStatusCallback OnComplete)
 {
 	const FString RefreshToken = Tokens.RefreshToken;
