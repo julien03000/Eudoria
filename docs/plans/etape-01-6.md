@@ -1,6 +1,6 @@
 # Étape 1.6 — Vérification de l'identité par un service tiers : le ticket d'entrée des mondes
 
-- **Statut :** ✅ Plan validé par le porteur le 2026-11-26 (6 recommandations du § 13) — partie A en cours
+- **Statut :** ✅ Plan validé par le porteur le 2026-11-26 (6 recommandations du § 13) — **partie A réalisée** (§ 18), en attente du contrôle du porteur ; partie B à faire
 - **Date :** 2026-11-25
 - **Branche :** `etape-01-identite`
 - **Périmètre :** sous-étape 1.6 **uniquement** : le noyau délivre un **ticket d'entrée** propre à un monde, publie
@@ -370,3 +370,44 @@ distincte), 3 = oui (`typ: eudoria-access+jwt` exigé par le noyau), 4 = oui (ti
 12. `feat(unreal): let the client request an entry ticket`
 13. `test(unreal): verify an entry ticket end to end against the core`
 14. `docs(architecture): describe the Unreal ticket verifier; update progress`
+
+## 18. Partie A — réalisation et écarts (2026-11-26)
+
+**Réalisée** (commits 1 à 9 du § 17, avec les écarts ci-dessous) ; **en attente du contrôle du porteur**, validation
+de l'ADR-0007 comprise, avant la partie B.
+
+Résultats :
+- **357 tests du noyau passent** (99 unitaires Identité, 98 du vérificateur tiers dont les 47 jeux d'essai, 160 d'API) ;
+  build 0 avertissement, `dotnet format` propre.
+- **Tests de mutation, tous détectés** : noyau sans contrôle du `typ` (3 tests échouent) ; tiers sans contrôle du
+  `typ` (8), de l'audience (7), sans mémoire des `jti` (1) ; publication avec `d` (4).
+- **Lancement réel** (`run-core.ps1`, HTTPS, `curl` sans `-k`) : jeton d'accès `typ: eudoria-access+jwt` ; ticket 200,
+  `no-store`, `expiresIn: 60`, en-tête `{alg, kid, typ: eudoria-entry+jwt}`, revendications exactement
+  `aud, iss, exp, iat, sub, jti`, `sub` = id de `/me` ; monde inconnu → 404 `world_unknown` ; `Sandbox` → 400
+  `world_id_invalid` ; sans jeton → 401 ; ticket présenté à `/me` → 401 ; clés : `application/jwk-set+json`,
+  `public, max-age=300`, sans `d`, même `kid` que le ticket. Journal : aucune ligne `fail`/`warn`, « ticket délivré »
+  présent, ni ticket ni jeton.
+- **Client Unreal** : `test-unreal.ps1` relancé contre le noyau (nouveau type de jeton d'accès) → 22 tests réussis.
+- Clé des tickets générée dans le `.env` du porteur (`new-signing-key.ps1 -EntryTickets`, jamais affichée).
+
+Écarts par rapport au plan :
+1. **Ordre et regroupement des commits** : le vérificateur tiers (commit 7) a été commité **avant** l'émission, car
+   les tests de bout en bout du noyau l'utilisent (chaque commit compile) ; les commits 5 (émission) et 6 (clés) n'en
+   font qu'un (même fichier de routes).
+2. **Débits** (§ 5.5 / § 11) : réglés dans `Identity:Throttling` (`EntryTicket` 30/min, `TicketKeys` 60/min), avec les
+   autres limites par adresse, plutôt que dans `Identity:EntryTickets` (même code de limitation pour toutes les routes).
+3. **Tests en plus** : le noyau refuse de démarrer si les deux clés sont identiques, si la durée du ticket n'est pas
+   entre 1 s et 5 min, ou si un monde connu est mal formé ; un jeton d'accès signé avec la clé des tickets est refusé.
+4. **Projet de tests séparé** `core/tests/Eudoria.ThirdParty.WorldVerifier.Tests` (règles une à une, horloge manuelle,
+   faux serveur de clés, jeux d'essai) ; il ne référence que le vérificateur.
+5. **Règles du vérificateur précisées** (identiques en C++ en partie B) : l'en-tête ne peut contenir **que**
+   `alg`, `typ`, `kid` (tout autre membre, `crit`/`jku` compris → `ticket_malformed`) ; les revendications inconnues
+   sont ignorées ; `iat`/`exp` entiers ; `sub` UUID en minuscules ; ticket ≤ 4 096 caractères ; un `kid` inconnu ne
+   provoque pas de téléchargement si le dernier date de moins d'une minute, **démarrage compris**.
+6. **« `../` → 400 »** (§ 12) : impossible à tester tel quel, les clients HTTP retirent `..` de l'adresse avant l'envoi
+   (la requête n'atteint jamais la route → 404). Remplacé par un point (`a.b`) et une barre encodée (`a%2Fb`) → 400.
+7. **Défaut trouvé et corrigé** par les tests : sous Windows, une clé publiée hors de la courbe lève
+   `PlatformNotSupportedException` (et non `CryptographicException`) : elle aurait fait échouer tout le téléchargement
+   des clés au lieu d'être ignorée.
+8. **Incident d'environnement** : Docker Desktop figé en mode économie de ressources (le moteur ne répondait plus) ;
+   arrêté puis relancé par Claude, puis tout a fonctionné. Aucune donnée touchée.

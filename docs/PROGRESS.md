@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-26 (plan 1.6 validé, réalisation à lancer)
+**Dernière mise à jour :** 2026-11-26 (1.6 partie A réalisée, en attente du contrôle du porteur)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,8 +35,28 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
-- **Plan de la sous-étape 1.6 ✅ validé par le porteur le 2026-11-26** (`docs/plans/etape-01-6.md`) — **réalisation à
-  lancer, aucun code écrit**. Ticket d'entrée des mondes : JWT ES256 `typ: eudoria-entry+jwt`, 60 s (tolérance 15 s côté
+- **Sous-étape 1.6 — partie A (noyau) réalisée le 2026-11-26, ⏸️ en attente du contrôle du porteur** (détail et
+  écarts : `docs/plans/etape-01-6.md` § 18) :
+  - **ADR-0007** « Ticket d'entrée des mondes » rédigé, statut **« Proposé »** → à valider par le porteur ;
+  - contrat core-v1 **1.4.0** : `POST /v1/worlds/{worldId}/entry-tickets` (200 / 400 `world_id_invalid` / 401 /
+    404 `world_unknown` / 429) et `GET /v1/entry-tickets/keys` (JWK Set public, cache 5 min) ; format du ticket et règles
+    de vérification décrits dans le contrat (tag `worlds`) ;
+  - jeton d'accès retypé **`eudoria-access+jwt`**, seul type accepté par le noyau (les anciens jetons `JWT` reçoivent
+    401 → le client renouvelle) ;
+  - module Identité, dossier `EntryTickets/` : clé de signature **distincte** (le noyau refuse de démarrer si elle
+    manque ou est identique à celle des jetons d'accès), `kid` RFC 7638, mondes connus `["sandbox"]` derrière
+    `IKnownWorlds`, débits 30/min (tickets) et 60/min (clés) ;
+  - **clé des tickets générée dans ton `.env`** (`IDENTITY_ENTRY_TICKET_SIGNING_KEY`, jamais affichée) ;
+    `new-signing-key.ps1 -EntryTickets` ; `.env.example`, `run-core.ps1`, `docs/SETUP.md` à jour ;
+  - **vérificateur tiers .NET** `core/tests/Eudoria.ThirdParty.WorldVerifier` (aucun lien avec le noyau, aucune
+    librairie JWT) + ses tests ; **47 jeux d'essai partagés** `shared/test-vectors/entry-tickets/` (clés publiques
+    seulement), que le C++ devra passer en partie B ;
+  - **357 tests passent** (99 + 98 + 160), build 0 avertissement, format propre ; **5 tests de mutation détectés** ;
+  - **lancement réel** vérifié (connexion → ticket → clés → refus ; journal sans `fail`/`warn`, sans ticket ni jeton) ;
+    **tests Unreal relancés contre le noyau : 22 réussis** (le client accepte le nouveau type de jeton) ;
+  - ROADMAP : critère « un composant tiers peut vérifier un jeton » **coché** (9 sur 11) ;
+  - incident : Docker Desktop figé (moteur muet en mode économie de ressources) → arrêté et relancé, sans perte.
+- **Plan de la sous-étape 1.6 ✅ validé par le porteur le 2026-11-26** (`docs/plans/etape-01-6.md`). Ticket d'entrée des mondes : JWT ES256 `typ: eudoria-entry+jwt`, 60 s (tolérance 15 s côté
   monde), audience `eudoria-world:<id>`, usage unique (`jti` retenus par le monde), signé par une **clé distincte** publiée
   en JWKS (`GET /v1/entry-tickets/keys`, `kid` RFC 7638) ; jeton d'accès retypé `eudoria-access+jwt` (seul type accepté
   par le noyau) ; premier monde `sandbox` (liste fermée dans `appsettings.json`) ; ADR-0007 à rédiger (« Proposé »).
@@ -219,12 +239,15 @@
 
 ## ⏭️ Prochaine étape exacte
 - *Non bloquant, quand le PC est au repos :* refaire les mesures de durée de la 1.4 (voir « Problèmes connus »).
-- **ROADMAP :** 8 critères de l'étape 1 sur 11 cochés (1.1 à 1.5).
+- **ROADMAP :** 9 critères de l'étape 1 sur 11 cochés (1.1 à 1.5, + vérification par un tiers en 1.6 A).
 - *Petit défaut connu, non bloquant :* `start-db.ps1` lancé avec toute sa sortie redirigée (`*>`, comme le fait Claude)
   échoue sur le message normal de Docker « Container … Running » (PowerShell 5.1 le prend pour une erreur). Sans effet
   quand le porteur lance le script lui-même. Correction possible (petit changement) : à proposer au porteur.
+- *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
+  reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Claude : réaliser la partie A de la sous-étape 1.6** (`docs/plans/etape-01-6.md`, commits 1 à 9 du § 17) :
-   commencer par l'**ADR-0007** (« Proposé ») puis le contrat core-v1 **1.4.0** ; noyau, vérificateur tiers .NET, jeux
-   d'essai, lancement réel, documentation. **S'arrêter après la partie A** pour le contrôle du porteur (validation de
-   l'ADR-0007 comprise) avant la partie B (C++).
+1. **Porteur : contrôler la partie A de la 1.6** — relire et valider (ou faire corriger) l'**ADR-0007**
+   (`docs/decisions/0007-ticket-entree-mondes.md`) et le § 18 du plan (écarts). Rien à lancer à la main.
+2. **Claude, après ce contrôle : partie B de la 1.6** (commits 10 à 14 du § 17) : vérificateur C++ dans `EudoriaCore`
+   (OpenSSL du moteur, `WITH_SERVER_CODE`), qui doit passer les 47 jeux d'essai partagés ; demande de ticket par
+   `UEudoriaSession` ; test de bout en bout Unreal contre le noyau. Passer l'ADR-0007 à « Accepté » si le porteur le valide.

@@ -1,7 +1,7 @@
 # EUDORIA — Architecture globale
 
-> Statut : **révision 4 (étape 1.2, 2026-11-24)**. Vue d'ensemble, plus l'état réel du code en section 8.
-> Les choix de technologies sont traités dans `docs/decisions/` (ADR 0001 à 0006 au statut « Accepté »).
+> Statut : **révision 5 (étape 1.6 A, 2026-11-26)**. Vue d'ensemble, plus l'état réel du code en sections 8 et 9.
+> Les choix de technologies sont traités dans `docs/decisions/` (ADR 0001 à 0006 « Accepté » ; ADR-0007 « Proposé »).
 > Hypothèses actuelles : client et serveurs de monde sous **Unreal Engine 5** (ADR-0003, ADR-0004),
 > noyau en **C#/.NET** (ADR-0001), base **PostgreSQL** (ADR-0002).
 
@@ -56,14 +56,16 @@ Le noyau n'utilise **pas** Unreal : c'est un service web classique, indépendant
 |---|---|---|
 | Client → Noyau | **HTTPS**, API publique versionnée (contrat OpenAPI) | Connexion, profil, avatar, inventaire, liste des mondes, achats. |
 | Client ↔ Monde | **Réseau Unreal** (UDP, réplication + appels au serveur) | Déplacements, actions, état du monde, discussion locale. |
-| Monde → Noyau | **HTTPS**, API interne versionnée (contrat OpenAPI), authentifiée par serveur | Vérifier un joueur, lire/écrire l'inventaire, transactions, rapport d'état au registre. |
+| Monde → Noyau | **HTTPS**, API interne versionnée (contrat OpenAPI), authentifiée par serveur | Lire le profil et l'avatar d'un joueur (déjà identifié par son ticket d'entrée, sans appel au noyau — ADR-0007), lire/écrire l'inventaire, transactions, rapport d'état au registre. |
 | Noyau → Monde | Notifications (plus tard, via système de messages) | Ex. : un objet a été donné au joueur depuis un autre monde. |
 
 ### Parcours type d'un joueur
 1. Le client se connecte au **noyau** (Identité) et reçoit un **jeton**.
 2. Il demande au **registre des mondes** où aller ; le registre renvoie l'adresse d'un serveur de monde compatible avec la version du client.
-3. Le client se connecte au **serveur dédié** du monde en présentant son jeton.
-4. Le serveur de monde **vérifie le jeton** (signature ou appel au noyau) et charge l'avatar depuis le noyau.
+3. Il demande au noyau un **ticket d'entrée** pour ce monde (60 s, usage unique), puis se connecte au **serveur
+   dédié** du monde en le présentant. Le jeton d'accès, lui, ne quitte jamais la liaison client ↔ noyau.
+4. Le serveur de monde **vérifie le ticket seul, par sa signature** (clés publiques du noyau en cache), sans appeler
+   le noyau (ADR-0007), puis charge l'avatar depuis le noyau.
 5. Pendant la session, le monde envoie au noyau tout ce qui doit être persisté ou qui touche l'économie.
 6. Pour changer de monde (portail), le client redemande une destination au registre et recommence à l'étape 3.
 
@@ -165,20 +167,23 @@ Le détail interne de chaque dossier sera défini à l'étape qui le crée.
 - Hébergement des serveurs (Linux), déploiement, observabilité → avant toute mise en ligne publique.
 - Mécanisme de distribution du contenu des mondes (paquets par monde) → étape 6.
 
-## 8. Le noyau aujourd'hui (étape 1.4)
+## 8. Le noyau aujourd'hui (étape 1.6 A)
 
 ```
 global.json                      # SDK .NET 11 épinglé ; lanceur de tests Microsoft.Testing.Platform
 .editorconfig                    # style de code (lu par Visual Studio et `dotnet format`) ; migrations = code généré
 .config/dotnet-tools.json        # outil local dotnet-ef (version épinglée)
 .env.example                     # modèle des réglages locaux (.env, jamais commité)
-shared/api/core-v1.yaml          # contrat OpenAPI public v1 — écrit AVANT le code
+shared/api/core-v1.yaml          # contrat OpenAPI public v1 (1.4.0) — écrit AVANT le code
+shared/test-vectors/entry-tickets/ # tickets signés + clés PUBLIQUES + verdict attendu : même verdict exigé de chaque vérificateur
 tools/dev/
 ├── docker-compose.yml           # PostgreSQL 18.7, publié sur 127.0.0.1 uniquement
-├── DotEnv.ps1                   # lecture de .env + chaîne de connexion et clé de signature en mémoire (partagés)
-├── new-signing-key.ps1          # génère la clé ES256 des jetons d'accès dans .env (jamais affichée)
+├── DotEnv.ps1                   # lecture de .env + chaîne de connexion et deux clés de signature en mémoire (partagés)
+├── new-signing-key.ps1          # génère dans .env la clé ES256 des jetons d'accès, ou celle des tickets (-EntryTickets)
 ├── build-password-blocklist.ps1 # fabrique la liste des mots de passe courants à partir de listes publiques (SecLists)
 ├── NewSigningKey.cs             # petit programme C# « fichier unique » appelé par le script ci-dessus
+├── new-entry-ticket-vectors.ps1 # régénère les jeux d'essai des tickets (clés jetables en mémoire)
+├── NewEntryTicketVectors.cs     # petit programme C# « fichier unique » appelé par le script ci-dessus
 ├── start-db.ps1                 # démarre / arrête la base (-Stop)
 ├── migrate.ps1                  # applique les migrations de chaque module (geste volontaire, jamais au démarrage)
 └── run-core.ps1                 # lance le noyau, chaîne de connexion et clé passées en mémoire
@@ -199,7 +204,10 @@ core/
 │   ├── Throttling/              # compteurs d'échecs (LoginThrottle), clé client (IPv4 / IPv6 /64), politiques de débit
 │   ├── Http/                    # lecture stricte des corps JSON ; réponses d'erreur Problem Details (400, 401, 409, 429, 503)
 │   ├── Registration/            # POST /v1/accounts : service d'inscription
-│   ├── Tokens/                  # options, clé ES256, émission des JWT, jeton de renouvellement ; refus des jetons révoqués
+│   ├── Tokens/                  # options, clé ES256 (kid), types explicites, émission des JWT, jeton de renouvellement ;
+│   │                            # refus des jetons révoqués
+│   ├── EntryTickets/            # tickets d'entrée des mondes : options, mondes connus (IKnownWorlds), clé distincte,
+│   │                            # émission, POST /v1/worlds/{worldId}/entry-tickets, GET /v1/entry-tickets/keys (JWKS)
 │   ├── Sessions/                # POST /v1/auth/login, /refresh, /logout : connexion, rotation, révocation, « tout déconnecter »
 │   ├── Profile/                 # GET /v1/me (route protégée)
 │   ├── AccountSecurity/         # POST /v1/me/password, POST /v1/me/sessions/revoke-all (routes protégées)
@@ -207,12 +215,17 @@ core/
 └── tests/
     ├── Eudoria.Core.Identity.Tests/  # unitaires : règles, NFKC, Argon2id, clé, JWT, jeton de renouvellement, liste de mots
     │                                 # de passe courants, compteurs d'échecs (horloge manuelle), clé client IPv6 /64
+    ├── Eudoria.ThirdParty.WorldVerifier/       # TIERS SIMULÉ : vérifie un ticket comme le fera un serveur de monde,
+    │                                           # sans aucun lien avec le code du noyau ni librairie JWT (référence du C++)
+    ├── Eudoria.ThirdParty.WorldVerifier.Tests/ # ses règles une à une (horloge manuelle, faux serveur de clés) + jeux d'essai
     └── Eudoria.Core.Api.Tests/
         ├── HealthEndpointsTests.cs   # comportement des routes santé
         ├── RegistrationTests.cs      # inscription de bout en bout, concurrence, journaux, migrations à jour
         ├── SessionTests.cs           # connexion, /me, jetons falsifiés, rotation, vol, expirations, déconnexion, concurrence
         ├── ThrottlingTests.cs        # blocages, e-mail inconnu, débit par adresse (IPv6 /64), 50 essais simultanés, 503
         ├── AccountSecurityTests.cs   # changement de mot de passe, « tout déconnecter », course avec un renouvellement
+        ├── EntryTicketTests.cs       # tickets : émission, refus, clés publiées, séparation des jetons, et le tiers
+        │                             # qui vérifie un vrai ticket (même UUID que /me)
         ├── ContractTests.cs          # le noyau respecte core-v1.yaml, dans les deux sens
         ├── SchemaValidatorTests.cs   # le validateur maison rejette bien ce qu'il prétend vérifier
         └── Infrastructure/           # noyau en mémoire (clé jetable, réglages et adresse client par test), PostgreSQL
@@ -258,11 +271,26 @@ core/
   changement de mot de passe et « tout déconnecter » 30/min. Adresse = IPv4, ou **préfixe /64** en IPv6 (un particulier
   dispose souvent d'un bloc /64 entier). (3) Au plus **4 hachages Argon2id simultanés** ; au-delà de 10 s d'attente,
   503 `server_busy`. Tous les seuils sont dans `appsettings.json` (`Identity:Throttling`).
-- **Jeton d'accès :** JWT signé **ES256** (ECDSA P-256), 15 min, en-tête `alg`/`kid`/`typ`, revendications `sub` (UUID du
-  compte), `iss` et `aud` = `eudoria-core`, `iat`, `exp`, `jti` — rien d'autre. Vérifié sans base de données : ES256
-  seul, notre clé, notre émetteur, audience `eudoria-core` seule, signature et expiration obligatoires, 30 s de
-  tolérance d'horloge, revendications gardées telles quelles (`MapInboundClaims = false`). **Il n'est accepté que par
-  le noyau** : les serveurs de monde recevront leur propre ticket d'entrée (à concevoir en 1.6).
+- **Jeton d'accès :** JWT signé **ES256** (ECDSA P-256), 15 min, en-tête `alg`/`kid`/`typ` (`typ` =
+  **`eudoria-access+jwt`** depuis la 1.6), revendications `sub` (UUID du compte), `iss` et `aud` = `eudoria-core`,
+  `iat`, `exp`, `jti` — rien d'autre. Vérifié sans base de données : ES256 seul, **type `eudoria-access+jwt` seul**
+  (le type générique `JWT` et le type des tickets sont refusés), notre clé, notre émetteur, audience `eudoria-core`
+  seule, signature et expiration obligatoires, 30 s de tolérance d'horloge, revendications gardées telles quelles
+  (`MapInboundClaims = false`). **Il n'est accepté que par le noyau** et n'est jamais remis à un monde.
+- **Tickets d'entrée des mondes (ADR-0007) :** `POST /v1/worlds/{worldId}/entry-tickets` (jeton d'accès obligatoire,
+  révocation comprise ; 30/min par adresse) → 200 `{ticket, expiresIn: 60}` (`Cache-Control: no-store`), 400
+  `world_id_invalid` (format `^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`), 404 `world_unknown`. Le ticket est un JWT ES256
+  signé par une **seconde clé** (`Identity:EntryTickets:SigningKey`, distincte de celle des jetons d'accès : le noyau
+  refuse de démarrer si elles sont identiques), en-tête exactement `{alg, typ: eudoria-entry+jwt, kid}`,
+  revendications exactement `iss`, `sub`, `aud` = `eudoria-world:<id>` (une seule valeur), `iat`, `exp` (+60 s),
+  `jti` (UUID v4). Mondes connus : liste fermée `Identity:EntryTickets:KnownWorlds` (`sandbox`), derrière l'interface
+  `IKnownWorlds` que le registre des mondes remplacera (étape 6). Journal : « ticket délivré, compte X, monde Y »,
+  jamais le ticket. Clés publiques : `GET /v1/entry-tickets/keys` (publique, 60/min par adresse) → JWK Set
+  (`application/jwk-set+json`, `Cache-Control: public, max-age=300`) avec la seule partie publique de la clé des
+  tickets, `kid` = empreinte **RFC 7638**. Un monde vérifie le ticket **seul** : signature par `kid`, `alg`, `typ`,
+  `iss`, `aud`, dates (15 s de tolérance), puis **usage unique** (il retient les `jti` acceptés jusqu'à `exp` + 15 s).
+  Vérificateur de référence : `core/tests/Eudoria.ThirdParty.WorldVerifier` (.NET sans lien avec le noyau) ;
+  vérificateur C++ du plugin `EudoriaCore` : partie B de la 1.6.
 - **Renouvellement :** `POST /v1/auth/refresh` consomme le jeton (rotation) et en remet un nouveau dans la même session,
   de façon atomique (transaction + verrou de ligne). Un jeton **déjà consommé** présenté à nouveau révoque **toute la
   session** (signe de vol ; version stricte, décision du porteur). `POST /v1/auth/logout` révoque la session et répond
@@ -281,9 +309,11 @@ core/
 - **Profil :** `GET /v1/me` (jeton d'accès obligatoire) → `id`, `pseudo`, `createdAt` (pas l'e-mail) ; sinon 401 avec
   `WWW-Authenticate: Bearer`.
 - **Configuration :** la chaîne de connexion vient de `ConnectionStrings:Core` (variable d'environnement
-  `ConnectionStrings__Core`) et la clé de signature de `Identity:Tokens:SigningKey` (variable
-  `Identity__Tokens__SigningKey`, lue dans `.env` par `run-core.ps1`). Sans l'une ou l'autre, le noyau **refuse de démarrer**.
-  Les autres réglages (durées des jetons, émetteur, audience, limites) sont dans `appsettings.json`.
+  `ConnectionStrings__Core`), la clé des jetons d'accès de `Identity:Tokens:SigningKey` et celle des tickets de
+  `Identity:EntryTickets:SigningKey` (variables `Identity__Tokens__SigningKey` et `Identity__EntryTickets__SigningKey`,
+  lues dans `.env` par `run-core.ps1`). Sans l'une d'elles, ou si les deux clés sont identiques, le noyau **refuse de
+  démarrer**. Les autres réglages (durées des jetons et tickets, émetteur, audience, mondes connus, limites) sont dans
+  `appsettings.json`.
 - **Santé :** `live` ne touche à rien (le processus répond) ; `ready` exécute `SELECT 1` sur PostgreSQL avec
   un délai maximum de 2 s et répond 503 sinon. Aucune réponse ne contient de détail interne : les causes
   sont dans les journaux du serveur seulement.

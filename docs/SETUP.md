@@ -110,6 +110,7 @@ Depuis la racine du dépôt, dans PowerShell :
 ```powershell
 Copy-Item .env.example .env       # une seule fois, puis remplacer le mot de passe dans .env
 .\tools\dev\new-signing-key.ps1   # une seule fois (depuis 1.3) : clé de signature des jetons, écrite dans .env sans être affichée
+.\tools\dev\new-signing-key.ps1 -EntryTickets   # une seule fois (depuis 1.6) : clé distincte des tickets d'entrée des mondes
 .\tools\dev\start-db.ps1          # démarre PostgreSQL (attend qu'il soit prêt)
 .\tools\dev\migrate.ps1           # applique les migrations manquantes (à relancer après chaque nouvelle migration)
 .\tools\dev\run-core.ps1          # démarre le noyau sur https://localhost:5443
@@ -151,6 +152,11 @@ Notes :
 - Les tests créent leur propre base PostgreSQL jetable (Testcontainers) : ils n'utilisent pas celle de `start-db.ps1`.
 - La clé de signature (`IDENTITY_TOKEN_SIGNING_KEY`) est secrète : ne jamais la copier ailleurs que dans `.env`.
   La remplacer (`new-signing-key.ps1 -Force`) oblige tout le monde à se reconnecter. Sans elle, le noyau refuse de démarrer.
+- La clé des tickets d'entrée (`IDENTITY_ENTRY_TICKET_SIGNING_KEY`, ADR-0007) est secrète elle aussi et **doit différer**
+  de la précédente (sinon le noyau refuse de démarrer). Seule sa partie publique est publiée
+  (`/v1/entry-tickets/keys`). La remplacer (`-EntryTickets -Force`) invalide seulement les tickets en cours (60 s).
+- Les jeux d'essai des tickets (`shared/test-vectors/entry-tickets/`) se régénèrent avec
+  `.\tools\dev\new-entry-ticket-vectors.ps1` (clés jetables, jamais écrites) ; à ne faire que si les règles changent.
 - `new-signing-key.ps1` compile un petit programme C# à la volée (`dotnet run --file`) ; le SDK range ce résultat
   (environ 9 Mo) dans `%TEMP%\dotnet\runfile` sur C: (supprimable).
 - `run-core.ps1` vise `127.0.0.1` et non `localhost` : `localhost` se résout d'abord en IPv6 (`::1`), où la base
