@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: EUDORIA Core — Public API
-  version: 1.3.1
+  version: 1.4.0
   description: |
     Public API of the EUDORIA core (clients). Contract-first: this file is written
     before the code and the core is tested against it (ADR-0001).
@@ -14,12 +14,35 @@ tags:
     description: Liveness and readiness probes.
   - name: accounts
     description: EUDORIA identities (accounts).
+  - name: worlds
+    description: |
+      Entry into worlds (ADR-0007). Before joining a world server, a client asks the core for an
+      entry ticket for that world; the world server checks it alone, without calling the core,
+      with the public keys published on /entry-tickets/keys.
+
+      Entry ticket format (what a world server implements):
+      - JWS compact serialization (three Base64 URL-safe parts without padding), signed with ES256
+        (ECDSA P-256 + SHA-256; the signature is r||s, 64 bytes).
+      - Header: exactly alg "ES256", typ "eudoria-entry+jwt", kid (the key to verify it with).
+      - Claims: exactly iss ("eudoria-core"), sub (account UUID, the same as Profile.id), aud
+        ("eudoria-world:<worldId>", a single string, never a list), iat and exp (whole seconds since
+        1970-01-01 UTC; exp = iat + 60), jti (unique identifier). Nothing else: no pseudo, no e-mail.
+
+      Verification rules: alg must be exactly "ES256" and typ exactly "eudoria-entry+jwt" (any
+      other value is refused, "none" and HMAC included); the key is chosen by kid among the
+      published keys; iss and aud are compared exactly, aud with the world's own audience; refused
+      when the current time is more than 15 seconds past exp, or iat more than 15 seconds in the
+      future; single use: the world remembers every accepted jti until exp + 15 s and refuses it
+      again. The ticket is never written to a log, and never put in a connection URL.
   - name: auth
     description: |
       Sessions: login, token renewal, logout. The access token is a JWT signed with ES256,
-      valid 15 minutes, audience "eudoria-core": it is accepted by the core API only (world
-      servers will get their own short-lived entry tickets, sub-step 1.6). The refresh token is
-      an opaque random value, stored server-side (hashed) and revocable; it is rotated on every use.
+      valid 15 minutes, header typ "eudoria-access+jwt", audience "eudoria-core": it is accepted
+      by the core API only, and is opaque to clients. World servers never receive it: they get
+      their own short-lived entry tickets (see the "worlds" tag). Since 1.4.0 the core refuses
+      access tokens of any other type, including those issued before (typ "JWT"): a client simply
+      gets 401 and renews its session. The refresh token is an opaque random value, stored
+      server-side (hashed) and revocable; it is rotated on every use.
 
       Limits (sub-step 1.4): failed logins are counted per e-mail and client address, and per
       e-mail alone; past the limit, attempts are refused for a while (429 with Retry-After), even
@@ -393,19 +416,123 @@ paths:
                 type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /worlds/{worldId}/entry-tickets:
+    post:
+      tags: [worlds]
+      operationId: issueEntryTicket
+      summary: Issues a single-use entry ticket for one world.
+      description: |
+        Returns an entry ticket (see the "worlds" tag) for the caller's account and the given world,
+        valid 60 seconds. Ask for it just before joining the world, use it once, keep it in memory
+        only. No request body. Revoked access tokens (password change, "revoke-all") get no ticket;
+        a ticket already issued stays valid until it expires.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: worldId
+          in: path
+          required: true
+          description: World identifier (opaque) — 1 to 64 of a-z, 0-9 and '-', not starting or ending with '-'.
+          schema:
+            type: string
+            pattern: '^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$'
+          example: sandbox
+      responses:
+        '200':
+          description: The ticket.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryTicket'
+        '400':
+          description: The world identifier is malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                errors:
+                  - field: worldId
+                    code: world_id_invalid
+        '401':
+          description: |
+            Missing, expired, malformed, forged or revoked access token. No body; the
+            WWW-Authenticate header says "Bearer".
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+        '404':
+          description: The core knows no world with this identifier.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                errors:
+                  - field: worldId
+                    code: world_unknown
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /entry-tickets/keys:
+    get:
+      tags: [worlds]
+      operationId: getEntryTicketKeys
+      summary: Public keys that verify entry tickets (JWK Set).
+      description: |
+        Public, no authentication: these are public keys only (never the private part "d"). World
+        servers download them at start-up, refresh them every 5 minutes, and pick the key by the
+        ticket's kid; an unknown kid triggers at most one new download per minute. The list can hold
+        several keys during a key rotation. kid is the RFC 7638 thumbprint of the key. The access
+        token keys are never published here.
+      responses:
+        '200':
+          description: The keys (RFC 7517 JWK Set).
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/PublicKeysCache'
+          content:
+            application/jwk-set+json:
+              schema:
+                $ref: '#/components/schemas/JwkSet'
+              example:
+                keys:
+                  - kty: EC
+                    crv: P-256
+                    x: f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU
+                    y: x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0
+                    kid: NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs
+                    alg: ES256
+                    use: sig
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Access token from /auth/login or /auth/refresh (ES256, audience "eudoria-core").
+      description: Access token from /auth/login or /auth/refresh (ES256, typ "eudoria-access+jwt", audience "eudoria-core").
   headers:
     NoStore:
       description: Token responses must never be cached (RFC 6749).
       schema:
         type: string
         enum: [no-store]
+    PublicKeysCache:
+      description: Public keys may be cached for 5 minutes (the world servers' refresh interval).
+      schema:
+        type: string
+        enum: ['public, max-age=300']
     RetryAfter:
       description: Number of seconds to wait before trying again (RFC 9110).
       schema:
@@ -510,7 +637,9 @@ components:
       properties:
         accessToken:
           type: string
-          description: JWT (ES256). Claims sub (account UUID), iss, aud ("eudoria-core"), iat, exp, jti.
+          description: |
+            JWT (ES256, typ "eudoria-access+jwt"), opaque to clients. Claims sub (account UUID), iss,
+            aud ("eudoria-core"), iat, exp, jti.
           pattern: '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
         tokenType:
           type: string
@@ -525,6 +654,57 @@ components:
         refreshExpiresIn:
           type: integer
           description: Lifetime of this refresh token, in seconds (never beyond the end of the session).
+    EntryTicket:
+      type: object
+      additionalProperties: false
+      required: [ticket, expiresIn]
+      properties:
+        ticket:
+          type: string
+          description: The entry ticket (JWS compact, ES256, typ "eudoria-entry+jwt"); format in the "worlds" tag.
+          pattern: '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+        expiresIn:
+          type: integer
+          description: Lifetime of the ticket, in seconds.
+    JwkSet:
+      type: object
+      additionalProperties: false
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/Jwk'
+    Jwk:
+      type: object
+      description: An ES256 public key (RFC 7517 / RFC 7518). Never contains the private part "d".
+      additionalProperties: false
+      required: [kty, crv, x, y, kid, alg, use]
+      properties:
+        kty:
+          type: string
+          enum: [EC]
+        crv:
+          type: string
+          enum: [P-256]
+        x:
+          type: string
+          description: X coordinate, 32 bytes, Base64 URL-safe without padding.
+          pattern: '^[A-Za-z0-9_-]{43}$'
+        y:
+          type: string
+          description: Y coordinate, 32 bytes, Base64 URL-safe without padding.
+          pattern: '^[A-Za-z0-9_-]{43}$'
+        kid:
+          type: string
+          description: RFC 7638 thumbprint (SHA-256, Base64 URL-safe without padding).
+          pattern: '^[A-Za-z0-9_-]{43}$'
+        alg:
+          type: string
+          enum: [ES256]
+        use:
+          type: string
+          enum: [sig]
     Profile:
       type: object
       additionalProperties: false
@@ -562,10 +742,11 @@ components:
       properties:
         field:
           type: string
-          enum: [body, request, email, pseudo, password, credentials, refreshToken, currentPassword, newPassword]
+          enum: [body, request, email, pseudo, password, credentials, refreshToken, currentPassword, newPassword, worldId]
           description: |
             'body' when the request as a whole is unreadable (not JSON, unknown or duplicate property,
-            wrong type, too large); 'request' for the limits (too_many_attempts, server_busy).
+            wrong type, too large); 'request' for the limits (too_many_attempts, server_busy);
+            'worldId' for the world identifier in the path.
         code:
           type: string
           enum:
@@ -587,6 +768,8 @@ components:
             - refresh_token_invalid
             - too_many_attempts
             - server_busy
+            - world_id_invalid
+            - world_unknown
     HealthStatus:
       type: object
       additionalProperties: false
