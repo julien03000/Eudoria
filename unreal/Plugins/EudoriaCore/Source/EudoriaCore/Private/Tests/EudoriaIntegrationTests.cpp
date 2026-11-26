@@ -2,8 +2,10 @@
 // Category: Eudoria.Integration. Skipped with an explicit warning when the core does not answer.
 
 #include "EudoriaCoreSettings.h"
+#include "EudoriaEntryTickets.h"
 #include "EudoriaHttpTransport.h"
 #include "EudoriaSession.h"
+#include "EudoriaTestSupport.h"
 #include "HttpManager.h"
 #include "HttpModule.h"
 #include "Misc/AutomationTest.h"
@@ -179,5 +181,105 @@ bool FEudoriaIntegrationErrorsTest::RunTest(const FString&)
 	TestFalse(TEXT("not logged in"), Session->IsLoggedIn());
 	return true;
 }
+
+#if EUDORIA_WITH_TICKET_VERIFIER
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaIntegrationEntryTicketTest, "Eudoria.Integration.EntryTicketVerifiedByTheWorld", IntegrationTestFlags)
+bool FEudoriaIntegrationEntryTicketTest::RunTest(const FString&)
+{
+	const TSharedRef<FEudoriaHttpModuleTransport> Transport = MakeTransport();
+	if (!IsCoreRunning(*this, *Transport))
+	{
+		return true;
+	}
+
+	EudoriaTestSupport::FLogCapture Capture;
+	TArray<FString> Tickets;
+	{
+		// The player: an account, a session, its profile.
+		const FString Suffix = UniqueSuffix();
+		const TSharedRef<FEudoriaSession> Session = MakeShared<FEudoriaSession>(Transport);
+		TOptional<FEudoriaApiStatus> Registered, LoggedIn;
+		Session->Register(FString::Printf(TEXT("ue-%s@example.com"), *Suffix), FString::Printf(TEXT("Ue_%s"), *Suffix), TestPassword,
+			[&](const FEudoriaApiStatus& Result) { Registered = Result; });
+		WaitFor([&] { return Registered.IsSet(); });
+		Session->Login(FString::Printf(TEXT("ue-%s@example.com"), *Suffix), TestPassword, [&](const FEudoriaApiStatus& Result) { LoggedIn = Result; });
+		WaitFor([&] { return LoggedIn.IsSet(); });
+		FString ProfileId;
+		bool bProfileDone = false;
+		Session->FetchProfile([&](const TValueOrError<FEudoriaProfile, FEudoriaApiError>& Result)
+		{
+			bProfileDone = true;
+			ProfileId = Result.HasValue() ? Result.GetValue().Id : FString();
+		});
+		WaitFor([&] { return bProfileDone; });
+		if (!TestFalse(TEXT("profile read"), ProfileId.IsEmpty()))
+		{
+			return false;
+		}
+
+		// The world "sandbox" starts: it downloads the core's public keys (real HTTPS).
+		const TSharedRef<FEudoriaTicketKeyStore> Keys = MakeShared<FEudoriaTicketKeyStore>(Transport, EudoriaSystemClock());
+		TOptional<bool> KeysReady;
+		Keys->Refresh([&](bool bSuccess) { KeysReady = bSuccess; });
+		WaitFor([&] { return KeysReady.IsSet(); });
+		if (!TestTrue(TEXT("world downloaded the keys"), KeysReady.Get(false)))
+		{
+			return false;
+		}
+		const TSharedRef<FEudoriaWorldTicketVerifier> Sandbox =
+			MakeShared<FEudoriaWorldTicketVerifier>(TEXT("sandbox"), Keys, MakeShared<FEudoriaReplayCache>(), EudoriaSystemClock());
+		const TSharedRef<FEudoriaWorldTicketVerifier> OtherWorld =
+			MakeShared<FEudoriaWorldTicketVerifier>(TEXT("other-world"), Keys, MakeShared<FEudoriaReplayCache>(), EudoriaSystemClock());
+
+		// The client asks the core for a ticket, just before joining.
+		auto RequestTicket = [&]() -> FString
+		{
+			TOptional<TValueOrError<FEudoriaEntryTicket, FEudoriaApiError>> Result;
+			Session->RequestEntryTicket(TEXT("sandbox"), [&](const TValueOrError<FEudoriaEntryTicket, FEudoriaApiError>& Received) { Result.Emplace(Received); });
+			WaitFor([&] { return Result.IsSet(); });
+			const FString Ticket = Result.IsSet() && Result->HasValue() ? Result->GetValue().Ticket : FString();
+			Tickets.Add(Ticket);
+			return Ticket;
+		};
+		auto Verify = [](FEudoriaWorldTicketVerifier& World, const FString& Ticket)
+		{
+			TOptional<FEudoriaTicketVerdict> Verdict;
+			World.Verify(Ticket, [&Verdict](const FEudoriaTicketVerdict& Result) { Verdict = Result; });
+			WaitFor([&Verdict] { return Verdict.IsSet(); });
+			return Verdict.Get(FEudoriaTicketVerdict{FString(), TEXT("no verdict")});
+		};
+
+		const FString Ticket = RequestTicket();
+		if (!TestFalse(TEXT("ticket received"), Ticket.IsEmpty()))
+		{
+			return false;
+		}
+		const int32 DownloadsBefore = Keys->GetDownloads();
+		const FEudoriaTicketVerdict Accepted = Verify(*Sandbox, Ticket);
+		const FEudoriaTicketVerdict Replayed = Verify(*Sandbox, Ticket);
+		const FEudoriaTicketVerdict Elsewhere = Verify(*OtherWorld, RequestTicket());
+
+		TestTrue(TEXT("the world accepts the ticket"), Accepted.IsAccepted());
+		TestEqual(TEXT("the world knows the same account as GET /me"), Accepted.AccountId, ProfileId);
+		TestEqual(TEXT("verified offline"), Keys->GetDownloads(), DownloadsBefore);
+		TestEqual(TEXT("second use refused"), Replayed.ToString(), FString(EudoriaTicketRejection::Replayed));
+		TestEqual(TEXT("another world refuses it"), Elsewhere.ToString(), FString(EudoriaTicketRejection::AudienceInvalid));
+	}
+
+	const FString Logged = Capture.Get();
+	for (const FString& Ticket : Tickets)
+	{
+		TArray<FString> Parts;
+		Ticket.ParseIntoArray(Parts, TEXT("."));
+		for (const FString& Part : Parts)
+		{
+			TestFalse(TEXT("no part of a ticket in the logs"), Logged.Contains(Part));
+		}
+	}
+	return true;
+}
+
+#endif // EUDORIA_WITH_TICKET_VERIFIER
 
 #endif // WITH_DEV_AUTOMATION_TESTS
