@@ -39,6 +39,12 @@ internal sealed class ThrottlingOptions
     /// <summary>Password change and "revoke all sessions".</summary>
     public RateLimit Account { get; set; } = new() { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) };
 
+    /// <summary>World entry tickets issued (plan 1.6).</summary>
+    public RateLimit EntryTicket { get; set; } = new() { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) };
+
+    /// <summary>Downloads of the public keys of the entry tickets (public route).</summary>
+    public RateLimit TicketKeys { get; set; } = new() { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) };
+
     /// <summary>Argon2id hashes computed at the same time (64 MiB each).</summary>
     public int MaxConcurrentHashes { get; set; } = 4;
 
@@ -49,7 +55,8 @@ internal sealed class ThrottlingOptions
         FreeFailures >= 1 && FirstBlock > TimeSpan.Zero && MaxBlock >= FirstBlock && FailureMemory > TimeSpan.Zero
         && IdentifierMaxFailures >= 1 && IdentifierWindow > TimeSpan.Zero && IdentifierBlock > TimeSpan.Zero
         && MaxTrackedKeys >= 2 && MaxConcurrentHashes >= 1 && HashQueueTimeout >= TimeSpan.Zero
-        && Login.IsValid() && Registration.IsValid() && Refresh.IsValid() && Account.IsValid();
+        && Login.IsValid() && Registration.IsValid() && Refresh.IsValid() && Account.IsValid()
+        && EntryTicket.IsValid() && TicketKeys.IsValid();
 }
 
 /// <summary>A sliding window: at most <see cref="PermitLimit"/> requests per <see cref="Window"/>.</summary>

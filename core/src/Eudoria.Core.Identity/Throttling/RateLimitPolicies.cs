@@ -17,6 +17,8 @@ internal static class RateLimitPolicies
     public const string Registration = "identity-registration";
     public const string Refresh = "identity-refresh";
     public const string Account = "identity-account";
+    public const string EntryTicket = "identity-entry-ticket";
+    public const string TicketKeys = "identity-ticket-keys";
 
     private const int SegmentsPerWindow = 6;
 
@@ -26,6 +28,8 @@ internal static class RateLimitPolicies
         Add(limiter, Registration, settings.Registration);
         Add(limiter, Refresh, settings.Refresh);
         Add(limiter, Account, settings.Account);
+        Add(limiter, EntryTicket, settings.EntryTicket);
+        Add(limiter, TicketKeys, settings.TicketKeys);
 
         limiter.OnRejected = async (context, cancellationToken) =>
         {
@@ -36,6 +40,8 @@ internal static class RateLimitPolicies
                     Registration => settings.Registration,
                     Refresh => settings.Refresh,
                     Account => settings.Account,
+                    EntryTicket => settings.EntryTicket,
+                    TicketKeys => settings.TicketKeys,
                     _ => settings.Login,
                 });
             await ProblemResults.TooManyRequests(context.HttpContext, retryAfter).ExecuteAsync(context.HttpContext);

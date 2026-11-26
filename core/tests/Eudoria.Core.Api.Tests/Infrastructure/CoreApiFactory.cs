@@ -13,7 +13,7 @@ namespace Eudoria.Core.Api.Tests.Infrastructure;
 
 /// <summary>
 /// Hosts the real core in memory, with the given database connection string and a throwaway
-/// signing key (<see cref="TestSigningKey"/>). Optionally captures every log entry and lets a test
+/// signing keys (<see cref="TestSigningKey"/>). Optionally captures every log entry and lets a test
 /// replace services (e.g. wrap the password hasher), the signing key or any setting.
 /// The per-address request limits are raised (tests send many requests from one client) unless
 /// <paramref name="settings"/> sets them; a request can claim a client address with the
@@ -24,6 +24,7 @@ public sealed class CoreApiFactory(
     CapturingLoggerProvider? logs = null,
     Action<IServiceCollection>? configureServices = null,
     string? signingKey = null,
+    string? entryTicketSigningKey = null,
     IReadOnlyDictionary<string, string>? settings = null) : WebApplicationFactory<Program>
 {
     /// <summary>A connection string to a port where nothing listens: the database is "down".</summary>
@@ -37,7 +38,8 @@ public sealed class CoreApiFactory(
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Core", connectionString);
         builder.UseSetting("Identity:Tokens:SigningKey", signingKey ?? TestSigningKey.Base64);
-        foreach (string route in new[] { "Login", "Registration", "Refresh", "Account" })
+        builder.UseSetting("Identity:EntryTickets:SigningKey", entryTicketSigningKey ?? TestSigningKey.EntryTicketBase64);
+        foreach (string route in new[] { "Login", "Registration", "Refresh", "Account", "EntryTicket", "TicketKeys" })
         {
             builder.UseSetting($"Identity:Throttling:{route}:PermitLimit", "100000");
         }
@@ -85,6 +87,12 @@ internal static class TestSigningKey
 
     /// <summary>The same key as the core under test sees it (same "kid"), to forge tokens in tests.</summary>
     public static readonly TokenSigningKey Key = TokenSigningKey.TryCreate(Base64)!;
+
+    /// <summary>The entry ticket key of every test host: a second, distinct key (ADR-0007).</summary>
+    public static readonly string EntryTicketBase64 = NewBase64Key(ECCurve.NamedCurves.nistP256);
+
+    /// <summary>The entry ticket key as the core under test sees it (RFC 7638 "kid").</summary>
+    public static readonly TokenSigningKey EntryTicketKey = TokenSigningKey.TryCreate(EntryTicketBase64, KeyIdStyle.Rfc7638Thumbprint)!;
 
     public static string NewBase64Key(ECCurve curve)
     {

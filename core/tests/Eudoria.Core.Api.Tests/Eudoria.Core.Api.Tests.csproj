@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Eudoria.Core.Api\Eudoria.Core.Api.csproj" />
+    <!-- The simulated third party (no link to the core's code), for the end-to-end ticket tests. -->
+    <ProjectReference Include="..\Eudoria.ThirdParty.WorldVerifier\Eudoria.ThirdParty.WorldVerifier.csproj" />
   </ItemGroup>
 
   <ItemGroup>

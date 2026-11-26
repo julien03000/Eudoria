@@ -1,4 +1,5 @@
 using Eudoria.Core.Identity.AccountSecurity;
+using Eudoria.Core.Identity.EntryTickets;
 using Eudoria.Core.Identity.Passwords;
 using Eudoria.Core.Identity.Persistence;
 using Eudoria.Core.Identity.Profile;
@@ -32,11 +33,19 @@ public static class IdentityModule
         "Missing or invalid access-token signing key 'Identity:Tokens:SigningKey' (expected: ECDSA P-256 private key, PKCS#8, Base64). " +
         "Generate it once with tools/dev/new-signing-key.ps1, then run the core with tools/dev/run-core.ps1.";
 
+    internal const string InvalidEntryTicketKeyMessage =
+        "Missing or invalid entry ticket signing key 'Identity:EntryTickets:SigningKey' (expected: ECDSA P-256 private key, PKCS#8, Base64). " +
+        "Generate it once with tools/dev/new-signing-key.ps1 -EntryTickets, then run the core with tools/dev/run-core.ps1.";
+
+    internal const string SameSigningKeysMessage =
+        "The entry ticket signing key must differ from the access-token signing key (ADR-0007). " +
+        "Generate a new one with tools/dev/new-signing-key.ps1 -EntryTickets -Force.";
+
     /// <summary>
     /// Registers the module's services. The host must also call <c>UseRateLimiter()</c> (limits per
     /// client address, plan 1.4). Requires the host to register the shared
     /// <see cref="NpgsqlDataSource"/> (one connection pool for the whole core).
-    /// The core refuses to start without a valid signing key.
+    /// The core refuses to start without its two valid, distinct signing keys (access tokens, entry tickets).
     /// </summary>
     public static IServiceCollection AddIdentityModule(this IServiceCollection services)
     {
@@ -75,6 +84,21 @@ public static class IdentityModule
             ?? throw new InvalidOperationException(InvalidSigningKeyMessage));
         services.AddSingleton<AccessTokenIssuer>();
 
+        // World entry tickets (ADR-0007): their own key, never the access-token key.
+        services.AddOptions<EntryTicketOptions>()
+            .BindConfiguration(EntryTicketOptions.SectionName)
+            .Validate(options => TokenSigningKey.IsValid(options.SigningKey), InvalidEntryTicketKeyMessage)
+            .Validate<IOptions<TokenOptions>>(
+                (options, tokens) => !TokenSigningKey.AreSameKey(options.SigningKey, tokens.Value.SigningKey),
+                SameSigningKeysMessage)
+            .Validate(options => options.IsValid(), "Invalid 'Identity:EntryTickets' settings (lifetime or known worlds).")
+            .ValidateOnStart();
+        services.AddSingleton(serviceProvider => new EntryTicketSigningKey(
+            TokenSigningKey.TryCreate(serviceProvider.GetRequiredService<IOptions<EntryTicketOptions>>().Value.SigningKey, KeyIdStyle.Rfc7638Thumbprint)
+            ?? throw new InvalidOperationException(InvalidEntryTicketKeyMessage)));
+        services.AddSingleton<EntryTicketIssuer>();
+        services.AddSingleton<IKnownWorlds, ConfiguredKnownWorlds>();
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<TokenSigningKey, IOptions<TokenOptions>>(ConfigureBearer);
@@ -93,6 +117,10 @@ public static class IdentityModule
             .RequireRateLimiting(RateLimitPolicies.Refresh);
         api.MapPost("/auth/logout", SessionEndpoints.LogoutAsync);
         api.MapGet("/me", MeEndpoint.GetAsync).RequireAuthorization();
+        api.MapPost("/worlds/{worldId}/entry-tickets", EntryTicketEndpoints.Issue)
+            .RequireAuthorization().RequireRateLimiting(RateLimitPolicies.EntryTicket);
+        api.MapGet("/entry-tickets/keys", EntryTicketEndpoints.GetKeys)
+            .RequireRateLimiting(RateLimitPolicies.TicketKeys);
         api.MapPost("/me/password", AccountSecurityEndpoints.ChangePasswordAsync)
             .RequireAuthorization().RequireRateLimiting(RateLimitPolicies.Account).WithHashingBusyAnswer();
         api.MapPost("/me/sessions/revoke-all", AccountSecurityEndpoints.RevokeAllSessionsAsync)

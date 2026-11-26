@@ -127,5 +127,7 @@ internal static class AccountRules
         public const string RefreshTokenInvalid = "refresh_token_invalid";
         public const string TooManyAttempts = "too_many_attempts";
         public const string ServerBusy = "server_busy";
+        public const string WorldIdInvalid = "world_id_invalid";
+        public const string WorldUnknown = "world_unknown";
     }
 }

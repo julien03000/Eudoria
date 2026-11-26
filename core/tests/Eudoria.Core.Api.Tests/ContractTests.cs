@@ -28,6 +28,8 @@ public sealed class ContractTests(PostgresFixture database)
     private static readonly Dictionary<string, string> OneRegistration = new() { ["Identity:Throttling:Registration:PermitLimit"] = "1" };
     private static readonly Dictionary<string, string> OneRefresh = new() { ["Identity:Throttling:Refresh:PermitLimit"] = "1" };
     private static readonly Dictionary<string, string> OneAccountRequest = new() { ["Identity:Throttling:Account:PermitLimit"] = "1" };
+    private static readonly Dictionary<string, string> OneEntryTicket = new() { ["Identity:Throttling:EntryTicket:PermitLimit"] = "1" };
+    private static readonly Dictionary<string, string> OneKeysDownload = new() { ["Identity:Throttling:TicketKeys:PermitLimit"] = "1" };
 
     // One hashing slot, a short wait: a request gets 503 while a scenario holds the slot.
     private static readonly Dictionary<string, string> OneHashingSlot = new()
@@ -127,6 +129,26 @@ public sealed class ContractTests(PostgresFixture database)
             using HttpResponseMessage first = await AccountSecurityTests.RevokeAllAsync(client, accessToken: null);
             return new(Body: null, BearerToken: null);
         }, OneAccountRequest),
+        new("POST", "/worlds/{worldId}/entry-tickets", HttpStatusCode.OK, DatabaseReachable: true, async (client, services) =>
+            new(Body: null, BearerToken: await AccessTokenAsync(client)), RequestPath: "/worlds/sandbox/entry-tickets"),
+        new("POST", "/worlds/{worldId}/entry-tickets", HttpStatusCode.BadRequest, DatabaseReachable: true, async (client, services) =>
+            new(Body: null, BearerToken: await AccessTokenAsync(client)), RequestPath: "/worlds/Sandbox/entry-tickets"),
+        new("POST", "/worlds/{worldId}/entry-tickets", HttpStatusCode.Unauthorized, DatabaseReachable: true,
+            RequestPath: "/worlds/sandbox/entry-tickets"),
+        new("POST", "/worlds/{worldId}/entry-tickets", HttpStatusCode.NotFound, DatabaseReachable: true, async (client, services) =>
+            new(Body: null, BearerToken: await AccessTokenAsync(client)), RequestPath: "/worlds/no-such-world/entry-tickets"),
+        new("POST", "/worlds/{worldId}/entry-tickets", HttpStatusCode.TooManyRequests, DatabaseReachable: true, async (client, services) =>
+        {
+            string accessToken = await AccessTokenAsync(client);
+            using HttpResponseMessage first = await EntryTicketTests.RequestTicketAsync(client, accessToken, "sandbox");
+            return new(Body: null, BearerToken: accessToken);
+        }, OneEntryTicket, RequestPath: "/worlds/sandbox/entry-tickets"),
+        new("GET", "/entry-tickets/keys", HttpStatusCode.OK, DatabaseReachable: false),
+        new("GET", "/entry-tickets/keys", HttpStatusCode.TooManyRequests, DatabaseReachable: false, async (client, services) =>
+        {
+            using HttpResponseMessage first = await client.GetAsync(new Uri("/v1/entry-tickets/keys", UriKind.Relative), TestContext.Current.CancellationToken);
+            return new(Body: null);
+        }, OneKeysDownload),
     ];
 
     [Fact]
@@ -191,7 +213,7 @@ public sealed class ContractTests(PostgresFixture database)
             using HttpClient client = factory.CreateClient();
             ScenarioRequest request = scenario.Prepare is null ? new(Body: null) : await scenario.Prepare(client, factory.Services);
 
-            using HttpResponseMessage response = await SendAsync(client, scenario.Method, basePath + scenario.Path, request);
+            using HttpResponseMessage response = await SendAsync(client, scenario.Method, basePath + (scenario.RequestPath ?? scenario.Path), request);
             request.Held?.Dispose();
 
             Assert.Equal(scenario.Status, response.StatusCode);
@@ -309,10 +331,12 @@ public sealed class ContractTests(PostgresFixture database)
     /// <param name="Prepare">Builds the request when the scenario runs; may first call the core
     /// (register, log in...) or use its services. Null: no body and no token.</param>
     /// <param name="Settings">Core settings for this scenario (e.g. low limits), or null.</param>
+    /// <param name="RequestPath">Concrete path sent (path parameters filled in) when <paramref name="Path"/> is a template.</param>
     private sealed record ContractScenario(
         string Method, string Path, HttpStatusCode Status, bool DatabaseReachable,
         Func<HttpClient, IServiceProvider, Task<ScenarioRequest>>? Prepare = null,
-        IReadOnlyDictionary<string, string>? Settings = null);
+        IReadOnlyDictionary<string, string>? Settings = null,
+        string? RequestPath = null);
 
     /// <param name="Body">JSON request body, or null.</param>
     /// <param name="BearerToken">Access token sent in the Authorization header, or null.</param>
