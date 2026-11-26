@@ -2,9 +2,10 @@
 .SYNOPSIS
     Runs the EUDORIA core locally, configured from the repository's .env file.
 .DESCRIPTION
-    The connection string and the token signing key are set in this process's memory only:
-    nothing is written to disk. Start the database first with .\tools\dev\start-db.ps1, and
-    generate the signing key once with .\tools\dev\new-signing-key.ps1.
+    The connection string and the two signing keys (access tokens, entry tickets) are set in this
+    process's memory only: nothing is written to disk. Start the database first with
+    .\tools\dev\start-db.ps1, and generate the keys once with .\tools\dev\new-signing-key.ps1, then
+    .\tools\dev\new-signing-key.ps1 -EntryTickets.
     The core listens over HTTPS only (https://localhost:<CORE_HTTPS_PORT>), with the .NET development
     certificate, which must be trusted once: dotnet dev-certs https --trust.
 #>
