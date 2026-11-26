@@ -6,5 +6,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Eudoria.Core.Api.Tests/Eudoria.Core.Api.Tests.csproj" />
     <Project Path="tests/Eudoria.Core.Identity.Tests/Eudoria.Core.Identity.Tests.csproj" />
+    <Project Path="tests/Eudoria.ThirdParty.WorldVerifier/Eudoria.ThirdParty.WorldVerifier.csproj" />
+    <Project Path="tests/Eudoria.ThirdParty.WorldVerifier.Tests/Eudoria.ThirdParty.WorldVerifier.Tests.csproj" />
   </Folder>
 </Solution>

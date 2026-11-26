@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A simulated third party (plan 1.6, section 8.1): verifies EUDORIA entry tickets exactly as a world
+    server will, with nothing but the base .NET library (HttpClient, System.Security.Cryptography,
+    System.Text.Json). On purpose: NO reference to the core's code, NO JWT library. The compiler
+    guarantees the first point; a test checks the assembly's references.
+    It is also the readable reference for the C++ verifier of the Unreal plugin (part B).
+  -->
+  <PropertyGroup>
+    <RootNamespace>Eudoria.ThirdParty.WorldVerifier</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- xUnit v3 test projects are executables. -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Eudoria.ThirdParty.WorldVerifier.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The verifier only: these tests never see the core's code either. -->
+    <ProjectReference Include="..\Eudoria.ThirdParty.WorldVerifier\Eudoria.ThirdParty.WorldVerifier.csproj" />
+  </ItemGroup>
+
+</Project>
