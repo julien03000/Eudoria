@@ -20,4 +20,9 @@
     <ProjectReference Include="..\Eudoria.ThirdParty.WorldVerifier\Eudoria.ThirdParty.WorldVerifier.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The shared test vectors, also checked by the C++ verifier of the Unreal plugin (part B). -->
+    <None Include="..\..\..\shared\test-vectors\entry-tickets\*.json" LinkBase="TestVectors" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
