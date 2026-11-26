@@ -2,13 +2,16 @@
 // This is how "simultaneous" 401s are reproduced deterministically. Category: Eudoria.Core.Session.
 
 #include "EudoriaSession.h"
+#include "EudoriaTestSupport.h"
 #include "Misc/AutomationTest.h"
-#include "Misc/OutputDeviceRedirector.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
 namespace EudoriaSessionTests
 {
+	using EudoriaTestSupport::FFakeTransport;
+	using EudoriaTestSupport::FLogCapture;
+
 	constexpr EAutomationTestFlags SessionTestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 
 	const TCHAR* Password = TEXT("S3cret-passphrase-for-tests");
@@ -22,47 +25,6 @@ namespace EudoriaSessionTests
 	{
 		return FString::Printf(TEXT(R"({"accessToken":"%s","tokenType":"Bearer","expiresIn":900,"refreshToken":"%s","refreshExpiresIn":604800})"), Access, Refresh);
 	}
-
-	/** Keeps every request pending until Answer() is called. */
-	class FFakeTransport final : public IEudoriaHttpTransport
-	{
-	public:
-		struct FPending
-		{
-			FEudoriaHttpRequest Request;
-			FEudoriaHttpCallback Callback;
-		};
-
-		virtual void Send(const FEudoriaHttpRequest& Request, FEudoriaHttpCallback OnComplete) override
-		{
-			Sent.Add(Request);
-			Pending.Add(FPending{Request, MoveTemp(OnComplete)});
-		}
-
-		int32 CountSent(const TCHAR* Path) const
-		{
-			return Sent.FilterByPredicate([Path](const FEudoriaHttpRequest& Request) { return Request.Path == Path; }).Num();
-		}
-
-		int32 CountPending(const TCHAR* Path) const
-		{
-			return Pending.FilterByPredicate([Path](const FPending& Item) { return Item.Request.Path == Path; }).Num();
-		}
-
-		/** Answers the oldest pending request to Path; returns the request answered. */
-		FEudoriaHttpRequest Answer(const TCHAR* Path, const FEudoriaHttpResponse& Response)
-		{
-			const int32 Index = Pending.IndexOfByPredicate([Path](const FPending& Item) { return Item.Request.Path == Path; });
-			check(Index != INDEX_NONE);
-			FPending Item = MoveTemp(Pending[Index]);
-			Pending.RemoveAt(Index);
-			Item.Callback(Response);
-			return Item.Request;
-		}
-
-		TArray<FEudoriaHttpRequest> Sent;
-		TArray<FPending> Pending;
-	};
 
 	struct FProfileOutcome
 	{
@@ -98,30 +60,6 @@ namespace EudoriaSessionTests
 		return Session;
 	}
 
-	/** Collects every log line written while it exists. */
-	class FLogCapture final : public FOutputDevice
-	{
-	public:
-		FLogCapture() { GLog->AddOutputDevice(this); }
-		virtual ~FLogCapture() override { GLog->RemoveOutputDevice(this); }
-
-		virtual void Serialize(const TCHAR* Message, ELogVerbosity::Type, const FName& Category) override
-		{
-			FScopeLock Lock(&Mutex);
-			Text += Category.ToString() + TEXT(": ") + Message + TEXT("\n");
-		}
-
-		FString Get()
-		{
-			GLog->Flush();
-			FScopeLock Lock(&Mutex);
-			return Text;
-		}
-
-	private:
-		FCriticalSection Mutex;
-		FString Text;
-	};
 }
 
 using namespace EudoriaSessionTests;
