@@ -58,7 +58,7 @@ public sealed class TokenTests
         JsonWebToken token = new(issuer.Issue(accountId, now));
 
         Assert.Equal("ES256", token.Alg);
-        Assert.Equal("JWT", token.Typ);
+        Assert.Equal("eudoria-access+jwt", token.Typ);
         Assert.Equal(key.SecurityKey.KeyId, token.Kid);
         Assert.Equal(["aud", "exp", "iat", "iss", "jti", "sub"], token.Claims.Select(claim => claim.Type).Order(StringComparer.Ordinal));
         Assert.Equal(accountId.ToString(), token.Subject);

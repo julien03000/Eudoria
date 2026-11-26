@@ -162,6 +162,9 @@ public sealed class SessionTests(PostgresFixture database)
     [InlineData("audience-eudoria")]
     [InlineData("audience-of-a-world")]
     [InlineData("other-issuer")]
+    [InlineData("typ-generic-jwt")]
+    [InlineData("typ-entry-ticket")]
+    [InlineData("typ-other-case")]
     public async Task Me_RejectsMissingExpiredForgedOrForeignTokens_With401(string kind)
     {
         await using CoreApiFactory factory = new(database.ConnectionString);
@@ -188,6 +191,10 @@ public sealed class SessionTests(PostgresFixture database)
             "audience-eudoria" => Forge(subject, audience: "eudoria"),
             "audience-of-a-world" => Forge(subject, audience: "world-xyz"),
             "other-issuer" => Forge(subject, issuer: "someone-else"),
+            // Real key, issuer and audience: only the type betrays them (plan 1.6, section 5.4).
+            "typ-generic-jwt" => Forge(subject, tokenType: "JWT"), // as issued before 1.6
+            "typ-entry-ticket" => Forge(subject, tokenType: TokenTypes.EntryTicket),
+            "typ-other-case" => Forge(subject, tokenType: "Eudoria-Access+JWT"),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
@@ -221,7 +228,7 @@ public sealed class SessionTests(PostgresFixture database)
         JsonWebToken token = new((await LoginJsonAsync(client, email))["accessToken"]!.GetValue<string>());
 
         Assert.Equal("ES256", token.Alg);
-        Assert.Equal("JWT", token.Typ);
+        Assert.Equal("eudoria-access+jwt", token.Typ);
         Assert.Equal(TestSigningKey.Key.SecurityKey.KeyId, token.Kid);
         Assert.Equal(["aud", "exp", "iat", "iss", "jti", "sub"], token.Claims.Select(claim => claim.Type).Order(StringComparer.Ordinal));
         Assert.Equal("eudoria-core", Assert.Single(token.Audiences));
@@ -550,12 +557,14 @@ public sealed class SessionTests(PostgresFixture database)
         DateTimeOffset? issuedAt = null,
         DateTimeOffset? expires = null,
         SigningCredentials? credentials = null,
-        bool hasExpiration = true)
+        bool hasExpiration = true,
+        string tokenType = TokenTypes.Access)
     {
         DateTimeOffset iat = issuedAt ?? DateTimeOffset.UtcNow;
         DateTimeOffset? exp = hasExpiration ? expires ?? iat.AddMinutes(15) : null;
         return new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = false }.CreateToken(new SecurityTokenDescriptor
         {
+            TokenType = tokenType,
             Issuer = issuer,
             Audience = audience,
             IssuedAt = iat.UtcDateTime,

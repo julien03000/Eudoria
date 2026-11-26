@@ -105,7 +105,7 @@ public static class IdentityModule
         npgsql.MigrationsHistoryTable(IdentityDbContext.MigrationsHistoryTable, IdentityDbContext.Schema);
 
     /// <summary>
-    /// Strict access-token validation: ES256 only, our key, our issuer, audience "eudoria-core",
+    /// Strict access-token validation: ES256 only, type "eudoria-access+jwt" only, our key, our issuer, audience "eudoria-core",
     /// signed and expiring tokens required, 30 s clock tolerance; claims kept as issued ("sub").
     /// Then tokens issued before a password change or "revoke all" are refused (<see cref="TokenRevocationCheck"/>).
     /// </summary>
@@ -119,7 +119,7 @@ public static class IdentityModule
             ValidAudience = options.Value.Audience,
             IssuerSigningKey = signingKey.SecurityKey,
             ValidAlgorithms = [SecurityAlgorithms.EcdsaSha256],
-            ValidTypes = [JwtConstants.HeaderType],
+            ValidTypes = [TokenTypes.Access],
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,

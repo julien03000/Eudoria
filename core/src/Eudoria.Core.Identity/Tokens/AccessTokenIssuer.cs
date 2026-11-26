@@ -6,7 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace Eudoria.Core.Identity.Tokens;
 
 /// <summary>
-/// Issues access tokens: JWT signed with ES256, header {alg, kid, typ}, claims sub (account UUID),
+/// Issues access tokens: JWT signed with ES256, header {alg, kid, typ: eudoria-access+jwt}, claims sub (account UUID),
 /// iss, aud, iat, exp, jti — and nothing else (no personal or changeable data).
 /// </summary>
 internal sealed class AccessTokenIssuer(TokenSigningKey signingKey, IOptions<TokenOptions> options)
@@ -19,6 +19,7 @@ internal sealed class AccessTokenIssuer(TokenSigningKey signingKey, IOptions<Tok
     public string Issue(Guid accountId, DateTimeOffset now) =>
         _handler.CreateToken(new SecurityTokenDescriptor
         {
+            TokenType = TokenTypes.Access,
             Issuer = options.Value.Issuer,
             Audience = options.Value.Audience,
             IssuedAt = now.UtcDateTime,
