@@ -19,6 +19,9 @@ private:
 	UFUNCTION()
 	void HandleLogoutClicked();
 
+	UFUNCTION()
+	void HandleEnterRenderTestClicked();
+
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> GreetingText;
 

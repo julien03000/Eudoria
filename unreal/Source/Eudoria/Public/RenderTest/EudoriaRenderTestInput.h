@@ -21,6 +21,7 @@ namespace EudoriaRenderTestInput
 		Look, // 2D: X = yaw, Y = pitch
 		Jump,
 		Run,  // held
+		Pause, // opens the Escape menu
 	};
 
 	struct FBinding
@@ -61,4 +62,7 @@ public:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> Run;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> Pause;
 };

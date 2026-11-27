@@ -28,6 +28,9 @@ public:
 protected:
 	virtual void NativeOnInitialized() override;
 
+	/** Colour behind the column (opaque for the front-end screens). */
+	virtual FLinearColor GetBackgroundColor() const;
+
 	/** Adds the screen's widgets to the column (AddTitle, AddTextField...). */
 	virtual void BuildContent() PURE_VIRTUAL(UEudoriaScreenBase::BuildContent, );
 

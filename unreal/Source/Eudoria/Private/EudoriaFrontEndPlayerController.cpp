@@ -1,6 +1,9 @@
 #include "EudoriaFrontEndPlayerController.h"
 
 #include "Blueprint/UserWidget.h"
+#include "EudoriaSession.h"
+#include "EudoriaSessionSubsystem.h"
+#include "RenderTest/EudoriaRenderTestFlow.h"
 #include "UI/EudoriaLoginScreen.h"
 #include "UI/EudoriaRegisterScreen.h"
 #include "UI/EudoriaWelcomeScreen.h"
@@ -14,7 +17,18 @@ void AEudoriaFrontEndPlayerController::BeginPlay()
 	if (IsLocalController())
 	{
 		SetShowMouseCursor(true);
-		ShowLogin(FText::GetEmpty(), false);
+		// Back from the render test with the session still open: "Bienvenue", not the login.
+		const UGameInstance* GameInstance = GetGameInstance();
+		const UEudoriaSessionSubsystem* Sessions = GameInstance ? GameInstance->GetSubsystem<UEudoriaSessionSubsystem>() : nullptr;
+		const bool bLoggedIn = Sessions && Sessions->GetSession().IsLoggedIn();
+		if (EudoriaRenderTestFlow::ScreenOnArrival(bLoggedIn) == EudoriaRenderTestFlow::EFrontEndScreen::Welcome)
+		{
+			ShowWelcome();
+		}
+		else
+		{
+			ShowLogin(FText::GetEmpty(), false);
+		}
 	}
 }
 

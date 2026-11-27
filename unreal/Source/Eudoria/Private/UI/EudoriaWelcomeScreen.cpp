@@ -5,6 +5,9 @@
 #include "Eudoria.h"
 #include "EudoriaFrontEndPlayerController.h"
 #include "EudoriaSession.h"
+#include "Kismet/GameplayStatics.h"
+#include "RenderTest/EudoriaRenderTestFlow.h"
+#include "RenderTest/EudoriaRenderTestSettings.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(EudoriaWelcomeScreen)
 
@@ -14,8 +17,18 @@ void UEudoriaWelcomeScreen::BuildContent()
 {
 	GreetingText = AddTitle(LOCTEXT("Loading", "Chargement du profil…"), 32);
 	DetailText = AddTitle(FText::GetEmpty(), 16);
+	UButton* Enter = AddButton(LOCTEXT("EnterRenderTest", "Entrer dans la scène de test"));
+	Enter->OnClicked.AddDynamic(this, &ThisClass::HandleEnterRenderTestClicked);
 	AddButton(LOCTEXT("Logout", "Se déconnecter"))->OnClicked.AddDynamic(this, &ThisClass::HandleLogoutClicked);
 	AddMessageLine();
+
+	const EudoriaRenderTestFlow::FEnterButton State =
+		EudoriaRenderTestFlow::EnterButtonState(GetDefault<UEudoriaRenderTestSettings>()->FindMissingContent());
+	if (!State.bEnabled)
+	{
+		Enter->SetIsEnabled(false);
+		ShowMessage(State.Reason, false);
+	}
 }
 
 void UEudoriaWelcomeScreen::NativeConstruct()
@@ -54,6 +67,13 @@ void UEudoriaWelcomeScreen::NativeConstruct()
 		This->GreetingText->SetText(FText::Format(LOCTEXT("Greeting", "Bienvenue, {0}"), FText::FromString(Profile.Pseudo)));
 		This->DetailText->SetText(FText::Format(LOCTEXT("CreatedAt", "Membre depuis le {0}"), FText::AsDate(Profile.CreatedAt, EDateTimeStyle::Long)));
 	});
+}
+
+void UEudoriaWelcomeScreen::HandleEnterRenderTestClicked()
+{
+	SetBusy(true);
+	// The session lives in the game instance: it survives the change of map.
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, GetDefault<UEudoriaRenderTestSettings>()->Map);
 }
 
 void UEudoriaWelcomeScreen::HandleLogoutClicked()

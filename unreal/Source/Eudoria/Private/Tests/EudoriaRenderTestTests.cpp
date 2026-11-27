@@ -2,6 +2,13 @@
 // Category: Eudoria.RenderTest. Run by tools/dev/test-unreal.ps1.
 
 #include "Camera/CameraComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/TargetPoint.h"
+#include "GameFramework/PlayerStart.h"
+#include "GameFramework/WorldSettings.h"
+#include "RenderTest/EudoriaRenderTestFlow.h"
+#include "RenderTest/EudoriaRenderTestGameMode.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EnhancedActionKeyMapping.h"
@@ -141,6 +148,7 @@ bool FEudoriaRenderTestKeysTest::RunTest(const FString&)
 		{EKeys::Gamepad_Left2D, Input->Move}, {EKeys::Mouse2D, Input->Look}, {EKeys::Gamepad_Right2D, Input->Look},
 		{EKeys::SpaceBar, Input->Jump}, {EKeys::Gamepad_FaceButton_Bottom, Input->Jump},
 		{EKeys::LeftShift, Input->Run}, {EKeys::Gamepad_LeftThumbstick, Input->Run},
+		{EKeys::Escape, Input->Pause}, {EKeys::Gamepad_Special_Right, Input->Pause},
 	};
 	for (const TPair<FKey, const UInputAction*>& Pair : Others)
 	{
@@ -149,7 +157,8 @@ bool FEudoriaRenderTestKeysTest::RunTest(const FString&)
 	}
 
 	TestTrue(TEXT("move and look are 2D"), Input->Move->ValueType == EInputActionValueType::Axis2D && Input->Look->ValueType == EInputActionValueType::Axis2D);
-	TestTrue(TEXT("jump and run are buttons"), Input->Jump->ValueType == EInputActionValueType::Boolean && Input->Run->ValueType == EInputActionValueType::Boolean);
+	TestTrue(TEXT("jump, run and pause are buttons"), Input->Jump->ValueType == EInputActionValueType::Boolean
+		&& Input->Run->ValueType == EInputActionValueType::Boolean && Input->Pause->ValueType == EInputActionValueType::Boolean);
 	return true;
 }
 
@@ -207,6 +216,88 @@ bool FEudoriaRenderTestCharacterTest::RunTest(const FString&)
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaRenderTestFlowTest, "Eudoria.RenderTest.Flow.InAndOut", TestFlags)
+bool FEudoriaRenderTestFlowTest::RunTest(const FString&)
+{
+	using namespace EudoriaRenderTestFlow;
+	TestTrue(TEXT("session open -> back on Bienvenue"), ScreenOnArrival(true) == EFrontEndScreen::Welcome);
+	TestTrue(TEXT("no session -> login"), ScreenOnArrival(false) == EFrontEndScreen::Login);
+
+	const FEnterButton Ready = EnterButtonState({});
+	TestTrue(TEXT("content set up -> button usable"), Ready.bEnabled);
+	TestTrue(TEXT("no reason shown"), Ready.Reason.IsEmpty());
+
+	const FEnterButton Missing = EnterButtonState({TEXT("Map")});
+	TestFalse(TEXT("content missing -> button disabled"), Missing.bEnabled);
+	TestTrue(TEXT("the reason says what to run"), Missing.Reason.ToString().Contains(TEXT("setup-render-test.ps1")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEudoriaRenderTestMapTest, "Eudoria.RenderTest.Map.Contents", TestFlags)
+bool FEudoriaRenderTestMapTest::RunTest(const FString&)
+{
+	const UEudoriaRenderTestSettings* Settings = GetDefault<UEudoriaRenderTestSettings>();
+	if (!Settings->FindMissingContent().IsEmpty())
+	{
+		AddWarning(TEXT("Render test map not built: not checked (run tools/dev/setup-render-test.ps1 -BuildMap)."));
+		return true;
+	}
+	const UWorld* World = Settings->Map.LoadSynchronous();
+	if (!TestNotNull(TEXT("map loads"), World) || !TestNotNull(TEXT("persistent level"), World->PersistentLevel.Get()))
+	{
+		return false;
+	}
+
+	const AWorldSettings* WorldSettings = World->GetWorldSettings();
+	TestTrue(TEXT("the map uses the render test game mode"),
+		WorldSettings && WorldSettings->DefaultGameMode == AEudoriaRenderTestGameMode::StaticClass());
+
+	int32 PlayerStarts = 0;
+	int32 Meshes = 0;
+	int32 NaniteMeshes = 0;
+	TSet<FName> BenchmarkTags;
+	for (const AActor* Actor : World->PersistentLevel->Actors)
+	{
+		if (!Actor)
+		{
+			continue;
+		}
+		if (Actor->IsA<APlayerStart>())
+		{
+			++PlayerStarts;
+		}
+		if (Actor->IsA<ATargetPoint>())
+		{
+			for (const FName& Tag : Actor->Tags)
+			{
+				if (Tag.ToString().StartsWith(TEXT("Eudoria.Benchmark.")))
+				{
+					BenchmarkTags.Add(Tag);
+				}
+			}
+		}
+		if (const AStaticMeshActor* MeshActor = Cast<AStaticMeshActor>(Actor))
+		{
+			const UStaticMesh* Mesh = MeshActor->GetStaticMeshComponent()->GetStaticMesh();
+			if (Mesh && Mesh->GetPathName().StartsWith(TEXT("/Game/Fab/")))
+			{
+				++Meshes;
+				NaniteMeshes += Mesh->IsNaniteEnabled() ? 1 : 0;
+			}
+		}
+	}
+	TestEqual(TEXT("one player start"), PlayerStarts, 1);
+	TestEqual(TEXT("five benchmark viewpoints"), BenchmarkTags.Num(), 5);
+	for (int32 Index = 1; Index <= 5; ++Index)
+	{
+		TestTrue(*FString::Printf(TEXT("viewpoint %d"), Index), BenchmarkTags.Contains(FName(*FString::Printf(TEXT("Eudoria.Benchmark.%d"), Index))));
+	}
+	TestTrue(TEXT("hundreds of Fab props"), Meshes > 300);
+	TestEqual(TEXT("every Fab prop is Nanite"), NaniteMeshes, Meshes);
+	AddInfo(FString::Printf(TEXT("%d Fab props, %d Nanite."), Meshes, NaniteMeshes));
 	return true;
 }
 

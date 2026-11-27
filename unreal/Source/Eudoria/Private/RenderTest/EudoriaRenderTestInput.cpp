@@ -31,6 +31,9 @@ namespace EudoriaRenderTestInput
 
 			{EKeys::LeftShift, EAction::Run},
 			{EKeys::Gamepad_LeftThumbstick, EAction::Run},
+
+			{EKeys::Escape, EAction::Pause},
+			{EKeys::Gamepad_Special_Right, EAction::Pause},
 		};
 	}
 }
@@ -54,6 +57,7 @@ UEudoriaRenderTestInput* UEudoriaRenderTestInput::Create(UObject* Outer)
 	Input->Look = NewAction(Input, TEXT("IA_Look"), EInputActionValueType::Axis2D);
 	Input->Jump = NewAction(Input, TEXT("IA_Jump"), EInputActionValueType::Boolean);
 	Input->Run = NewAction(Input, TEXT("IA_Run"), EInputActionValueType::Boolean);
+	Input->Pause = NewAction(Input, TEXT("IA_Pause"), EInputActionValueType::Boolean);
 	Input->Context = NewObject<UInputMappingContext>(Input, TEXT("IMC_RenderTest"));
 
 	for (const FBinding& Binding : DefaultBindings())
@@ -89,6 +93,8 @@ const UInputAction* UEudoriaRenderTestInput::GetAction(EudoriaRenderTestInput::E
 		return Jump;
 	case EudoriaRenderTestInput::EAction::Run:
 		return Run;
+	case EudoriaRenderTestInput::EAction::Pause:
+		return Pause;
 	}
 	return nullptr;
 }

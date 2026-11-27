@@ -27,7 +27,7 @@ void UEudoriaScreenBase::NativeOnInitialized()
 	Super::NativeOnInitialized();
 
 	UBorder* Background = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Background"));
-	Background->SetBrushColor(BackgroundColor);
+	Background->SetBrushColor(GetBackgroundColor());
 	Background->SetHorizontalAlignment(HAlign_Center);
 	Background->SetVerticalAlignment(VAlign_Center);
 	WidgetTree->RootWidget = Background;
@@ -40,6 +40,11 @@ void UEudoriaScreenBase::NativeOnInitialized()
 	Width->SetContent(Column);
 
 	BuildContent();
+}
+
+FLinearColor UEudoriaScreenBase::GetBackgroundColor() const
+{
+	return BackgroundColor;
 }
 
 UTextBlock* UEudoriaScreenBase::AddTitle(const FText& Text, int32 FontSize)
