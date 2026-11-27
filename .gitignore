@@ -64,6 +64,11 @@ DerivedDataCache/
 Build/**/*.pak
 ArchivedBuilds/
 Packaged/
+# Render test content (sub-step 1.7, decisions D1-D2): third-party assets and the map built
+# from them stay out of the repository; tools/dev/setup-render-test.ps1 puts them back.
+/unreal/Content/Characters/
+/unreal/Content/Fab/
+/unreal/Content/RenderTest/
 # Crash reports & profiling captures
 *.dmp
 *.utrace
