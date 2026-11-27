@@ -41,5 +41,76 @@
       "Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Right.uasset"
     ]
   },
-  "fab": []
+  "fab": [
+    {
+      "name": "Mossy Forest Floor",
+      "url": "https://www.fab.com/listings/31b154e8-dea5-49c8-9b29-6362fe1a4a8d",
+      "folder": "Fab/Megascans/Surfaces/Mossy_Forest_Floor_vfylbge"
+    },
+    {
+      "name": "Nordic Mossy Ground",
+      "url": "https://www.fab.com/listings/ec83e70d-1c43-4530-a541-cff3e621b96a",
+      "folder": "Fab/Megascans/3D/Nordic_Mossy_Ground_vi2ldcomw"
+    },
+    {
+      "name": "Granite Cliff",
+      "url": "https://www.fab.com/listings/9253e224-5522-4052-82e2-2447e62ff80f",
+      "folder": "Fab/Megascans/3D/Granite_Cliff_rivav"
+    },
+    {
+      "name": "Mossy Rock Face",
+      "url": "https://www.fab.com/listings/6b4525bd-afe0-47d9-84e7-cdf4f5739f71",
+      "folder": "Fab/Megascans/3D/Mossy_Rock_Face_ti2udfqda"
+    },
+    {
+      "name": "Mossy Rock Formation",
+      "url": "https://www.fab.com/listings/3acf7891-dfe0-45da-b210-813fdc3d1f77",
+      "folder": "Fab/Megascans/3D/Mossy_Rock_Formation_plFhY"
+    },
+    {
+      "name": "Mossy Forest Boulder",
+      "url": "https://www.fab.com/listings/8cf6b5fa-fc74-4e00-aa37-8cb239bf9782",
+      "folder": "Fab/Megascans/3D/Mossy_Forest_Boulder_wfstcdnaw"
+    },
+    {
+      "name": "Nordic Forest Ledge Rock Medium",
+      "url": "https://www.fab.com/listings/034fcd08-2e37-407f-9e32-26291a8d18a3",
+      "folder": "Fab/Megascans/3D/Nordic_Forest_Ledge_Rock_Medium_xislecsqx"
+    },
+    {
+      "name": "Nordic Forest Cluster Medium",
+      "url": "https://www.fab.com/listings/b10a5b93-0ef7-4eb0-acef-4d5353f0220b",
+      "folder": "Fab/Megascans/3D/Nordic_Forest_Cluster_Medium_xisgcic"
+    },
+    {
+      "name": "Nordic Forest Ledge Root Large",
+      "url": "https://www.fab.com/listings/65aeab37-9ed4-43d4-9665-471c5d6be77a",
+      "folder": "Fab/Megascans/3D/Nordic_Forest_Ledge_Root_Large_xj1odjt"
+    },
+    {
+      "name": "Nordic Forest Tree Log Large",
+      "url": "https://www.fab.com/listings/c11bff3d-4576-432e-a7cf-e4da029ffd8b",
+      "folder": "Fab/Megascans/3D/Nordic_Forest_Tree_Log_Large_xiclaj1r"
+    },
+    {
+      "name": "Spruce Tree Stump",
+      "url": "https://www.fab.com/listings/ed8af4af-861e-44b8-8c47-e442ee2d33e1",
+      "folder": "Fab/Megascans/3D/Spruce_Tree_Stump_tjuxbgfda"
+    },
+    {
+      "name": "Lady Fern",
+      "url": "https://www.fab.com/listings/3eead001-af7f-4b65-afcc-89c368f089bc",
+      "folder": "Fab/Megascans/Plants/Lady_Fern_wdvlditia"
+    },
+    {
+      "name": "Tree Debris Pack",
+      "url": "https://www.fab.com/listings/807c5914-bf82-4199-a5f6-ac6618395b39",
+      "folder": "Fab/Megascans/3D/Tree_Debris_Pack_vdqjfjhiw"
+    },
+    {
+      "name": "Fab shared materials (created by the Fab plugin at the first import)",
+      "url": "https://www.fab.com/listings/31b154e8-dea5-49c8-9b29-6362fe1a4a8d",
+      "folder": "Fab/Materials"
+    }
+  ]
 }

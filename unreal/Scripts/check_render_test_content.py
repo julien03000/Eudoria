@@ -53,12 +53,26 @@ def main():
                 if not package_exists(registry, str(dependency)):
                     missing_soft.append({"asset": package, "missing": str(dependency)})
 
+    # Nanite state of every static mesh, read from the asset registry tags (no asset is loaded:
+    # the Fab content weighs several GB and this PC has 16 GB of RAM).
+    meshes = []
+    for root in CHECKED_ROOTS:
+        for asset in registry.get_assets_by_path(root, recursive=True):
+            if str(asset.asset_class_path.asset_name) != "StaticMesh":
+                continue
+            meshes.append({
+                "mesh": str(asset.package_name),
+                "naniteEnabled": str(asset.get_tag_value("NaniteEnabled") or "unknown"),
+                "triangles": str(asset.get_tag_value("Triangles") or "unknown"),
+            })
+
     output_dir = os.path.join(unreal.Paths.project_saved_dir(), "RenderTest")
     os.makedirs(output_dir, exist_ok=True)
     result = {
         "checkedPackages": len(checked),
         "missingHard": missing_hard,
         "missingSoft": missing_soft,
+        "staticMeshes": meshes,
     }
     with open(os.path.join(output_dir, "content-check.json"), "w", encoding="utf-8") as stream:
         json.dump(result, stream, indent=2)

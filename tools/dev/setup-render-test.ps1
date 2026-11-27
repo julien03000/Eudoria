@@ -119,6 +119,13 @@ if ($VerifyReferences) {
             $check.checkedPackages, @($check.missingHard).Count, @($check.missingSoft).Count)
         foreach ($entry in @($check.missingHard)) { $problems.Add("Missing hard reference: $($entry.asset) -> $($entry.missing)") }
         foreach ($entry in @($check.missingSoft)) { Write-Host "  (soft, not blocking) $($entry.asset) -> $($entry.missing)" }
+        # Plan 1.7, § 6.2: every Fab mesh must be Nanite (the point of the render test).
+        foreach ($mesh in @($check.staticMeshes)) {
+            Write-Host ("  mesh {0}: Nanite={1}, triangles={2}" -f $mesh.mesh, $mesh.naniteEnabled, $mesh.triangles)
+            if ($mesh.mesh.StartsWith('/Game/Fab/') -and $mesh.naniteEnabled -ne 'True') {
+                $problems.Add("Fab mesh without Nanite: $($mesh.mesh) (NaniteEnabled=$($mesh.naniteEnabled))")
+            }
+        }
     }
 }
 
