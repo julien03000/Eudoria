@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-27 (plan de la 1.7 ✅ validé ; partie A en cours, en attente de l'action M1 du porteur)
+**Dernière mise à jour :** 2026-11-27 (1.7 partie A faite ; ⏸️ point de contrôle A : tableau des assets à valider par le porteur)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -44,8 +44,23 @@
     mélange utilise 8 directions : 14 animations ajoutées) → **0 référence obligatoire manquante** ; 18 références
     « souples » sans effet (aperçus vers Quinn, Control Rig non chargé). Testé : copie, deuxième passage (rien à copier),
     fichier supprimé (recopié), moteur introuvable (erreur claire). `Eudoria.Editor.NoBlueprintLogic` passe avec ce contenu ;
-  - **⏸️ en attente : M1 (porteur, lanceur Epic)** — réinstaller le plugin Fab sur le moteur de E: ; ensuite je
-    recompile aussitôt (bug `FabToolset`, plan § 4.3).
+  - **plugin Fab 0.0.23 installé sur E:** (`E:\Epic Games\UE_5.8\Engine\Plugins\Fab`, 117 Mo, actif par défaut).
+    Le lanceur refusait l'installation (« existing install », ancien enregistrement vers C:) : avec l'accord du porteur,
+    lanceur arrêté et enregistrement `…\Manifests\52E3D1DF6B8DABBF4846C85F5A078A29.item` renommé en `.item.bak`, puis
+    réinstallation par le porteur. **Compilation C++ réussie aussitôt après** (le bug `FabToolset` de la 0.0.22 ne
+    touche pas la 0.0.23 : plus de module `FabToolset`) ; l'éditeur charge le plugin sans erreur ; tests
+    `Eudoria.Editor.*` OK ;
+  - **cache du plugin Fab sur E:** : réglage `CacheDirectoryPath` (classe `FabSettings`, enregistré par projet et par
+    utilisateur dans `Saved/`) → `E:\Dev\FabCache`, écrit par `setup-render-test.ps1` ; **relu par l'éditeur** (valeur
+    d'origine : `C:/Users/…/Temp/FabLibrary`). M3 inutile. **Cache « Vault » du lanceur** réglé par le porteur sur
+    `E:\Dev\EpicVaultCache` (M2). Preuve finale (rien écrit sur C:) au premier import ;
+  - **tableau des assets proposé** (`docs/render-test/assets.md`) : 13 Megascans « forêt nordique » (sol, falaise en
+    surplomb de 29 m, rochers, racines, tronc, souche, fougère, débris), tous gratuits, **licence standard de Fab**
+    vérifiée sur chaque fiche ; licence lue sur fab.com/eula : le partage par **dépôt privé** est permis (la « zone
+    grise » du plan n'en était pas une ; D1 reste justifiée par le quota) ; niveaux « Personnelle » et
+    « Professionnelle » aux mêmes droits, tous deux à 0 € → « Professionnelle » recommandée. Tailles inconnues avant
+    import (non affichées par Fab) ;
+  - **⏸️ point de contrôle A** : le porteur valide le tableau (et le niveau de licence).
 - **Plan de la sous-étape 1.7 ✅ validé par le porteur le 2026-11-27** (`docs/plans/etape-01-7.md`) : D1 à D8 =
   recommandations, avec deux compléments (§ 11.1) : point ouvert sur les Animation Blueprints / Control Rig ajouté à
   l'ADR-0003 et à la ROADMAP (décision à l'étape 2) ; seconde campagne de mesures identique après le passage à 32 Go
@@ -264,8 +279,8 @@
 - **Compilateur MSVC 14.52** « plus récent que la version préférée » d'UE 5.8 (14.50) : UBT l'accepte avec un
   avertissement, et signale un avertissement C4864 dans un en-tête **du moteur** (`Misc/Attribute.h`), pas dans notre
   code. Rien à faire tant que ça compile ; installer MSVC 14.50 serait une installation (accord du porteur requis).
-- Plugin Fab 5.8 enregistré par le lanceur dans un dossier inexistant (`C:\Program Files\Epic Games\UE_5.8`) : à
-  réinstaller sur le moteur de E: au début de la 1.7 (plan § 4 ; attention au bug `FabToolset`, § 4.3).
+- ~~Plugin Fab enregistré vers un dossier inexistant de C:~~ : résolu le 2026-11-27 (0.0.23 sur E:). L'ancien
+  enregistrement renommé `…\Manifests\52E3D1DF6B8DABBF4846C85F5A078A29.item.bak` est supprimable à la fin de la 1.7.
 - La limite mémoire WSL (4 Go) s'applique aussi à la distribution Ubuntu déjà présente sur le PC.
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
@@ -276,7 +291,9 @@
 - *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
   reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Porteur : M1** (plan 1.7 § 4.1 et § 10) — dans le lanceur Epic, retirer puis réinstaller le plugin Fab sur le
-   moteur 5.8 ; et M2 : cache « Vault » du lanceur vers `E:\Dev\EpicVaultCache` si l'option existe. Éditeur fermé.
-2. **Claude, ensuite :** vérifier l'emplacement du plugin, **recompiler aussitôt** (bug `FabToolset`, § 4.3), puis
-   cache de Fab sur E: (M3) avec preuve, puis tableau des assets à faire valider (§ 5.1) → point de contrôle A.
+1. **Porteur : point de contrôle A** — relire et valider le tableau `docs/render-test/assets.md` (13 assets, licence
+   « Professionnelle » recommandée).
+2. **Ensuite (M4, M5)** : le porteur ajoute les assets à sa bibliothèque sur fab.com et les importe par la fenêtre Fab
+   de l'éditeur ; **commencer par un seul asset** pour mesurer sa taille et prouver que le cache va sur E: ; Claude
+   remplit la liste `render-test-content.json` et le tableau, puis `setup-render-test.ps1 -VerifyReferences`.
+3. **Puis partie B** (scène et personnage en C++).

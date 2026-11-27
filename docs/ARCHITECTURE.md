@@ -388,3 +388,10 @@ unreal/
   vérification « aucune logique Blueprint » (`Eudoria.Editor.*`, avec la preuve qu'un Blueprint fautif est détecté).
   Cette vérification est en C++ : Python ne peut pas lire les nœuds des graphes (plan 1.5, § 14).
 - **Scripts :** `build-unreal.ps1` (compilation, éditeur fermé), `run-client.ps1` (client en fenêtre), `test-unreal.ps1`.
+- **Contenu de la scène de test de rendu (1.7, hors du dépôt) :** `unreal/Content/Characters/` (sélection du mannequin
+  copiée depuis le moteur), `unreal/Content/Fab/` (assets Megascans importés par le plugin Fab) et
+  `unreal/Content/RenderTest/` (la carte, générée) sont **ignorés par git** (décisions D1/D2 du plan 1.7).
+  `tools/dev/setup-render-test.ps1` les remet en place ou dit ce qui manque, d'après `tools/dev/render-test-content.json`
+  (liste exacte) ; il règle aussi le cache du plugin Fab sur E:. Avec `-VerifyReferences`, il lance
+  `unreal/Scripts/check_render_test_content.py` dans l'éditeur sans fenêtre (références manquantes, résultat en JSON
+  dans `Saved/RenderTest/`). Recette lisible : `docs/render-test/assets.md`.

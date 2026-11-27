@@ -92,7 +92,7 @@ licence n'est pas la licence standard (ou CC0), et tout asset qui apporte un **B
 | | Commités (Git LFS) | **Hors du dépôt (recommandé)** |
 |---|---|---|
 | Quota GitHub (10 Gio de stockage, 10 Gio de téléchargement / mois) | Consommé **définitivement** : l'historique garde chaque version, et supprimer un fichier LFS ne rend pas le quota (il faut supprimer le dépôt). Chaque clonage complet consomme aussi le téléchargement. | 0 |
-| Licence | « Redistribution seule interdite » : un dépôt **privé** n'est pas traité par les textes lus → zone grise | Aucune question |
+| Licence | « Redistribution seule interdite » ; **le texte de la licence (fab.com/eula, lu le 2026-11-27) autorise le partage avec des collaborateurs « par le biais d'un référentiel privé »** → permis, contrairement à ce que laissaient croire les articles | Aucune question |
 | Reproductibilité | Immédiate | Par la recette `docs/render-test/assets.md` + un script qui vérifie la présence et la taille |
 | Usage | Scène de **test**, jetable | Adapté |
 

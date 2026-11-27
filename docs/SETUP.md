@@ -87,7 +87,8 @@ affichée en bas de l'installateur.
 | Paquets NuGet (.NET) | `%USERPROFILE%\.nuget\packages` | ✅ **Redirigé le 2026-11-24** vers `E:\Dev\NuGet\packages` (variable utilisateur `NUGET_PACKAGES`) | Fait |
 | Cache de téléchargement Visual Studio | `C:\ProgramData\Microsoft\VisualStudio\Packages` | — | À l'installation de VS |
 | Disque virtuel Docker (WSL 2) | `%LOCALAPPDATA%\Docker` | — | À l'installation de Docker |
-| Bibliothèque Fab (assets téléchargés) | `%LOCALAPPDATA%\Temp\FabLibrary` | supprimée le 2026-11-24 (6,1 Go libérés) | Rediriger vers E: dans les réglages du lanceur/Fab avant de retélécharger des assets |
+| Cache du plugin Fab (assets téléchargés) | `%LOCALAPPDATA%\Temp\FabLibrary` | ✅ **Redirigé le 2026-11-27** vers `E:\Dev\FabCache` : réglage `CacheDirectoryPath` du plugin, **par projet et par utilisateur** (`unreal\Saved\Config\WindowsEditor\EditorPerProjectUserSettings.ini`, non versionné), écrit par `tools\dev\setup-render-test.ps1` (éditeur fermé). Ancienne bibliothèque supprimée le 2026-11-24 (6,1 Go) | Fait (à refaire sur un nouveau clone : relancer le script) |
+| Cache « Vault » du lanceur Epic | `C:\ProgramData\Epic\EpicGamesLauncher\VaultCache` | ✅ **Redirigé le 2026-11-27** par le porteur vers `E:\Dev\EpicVaultCache` (Paramètres du lanceur) | Fait |
 
 ## Lancer le noyau en local (depuis l'étape 1.1)
 
@@ -180,6 +181,24 @@ Notes :
 - Les tests `Eudoria.Integration.*` créent de vrais comptes de test (`ue-…@example.com`) dans la base locale.
 - Si l'éditeur propose de « reconstruire » des modules : répondre **Non** et compiler avec `build-unreal.ps1`.
 - 16 Go de RAM : ne pas compiler pendant que l'éditeur ou le client tourne.
+
+## Contenu de la scène de test de rendu (depuis l'étape 1.7)
+
+Ce contenu n'est **pas dans le dépôt** (plan 1.7, décision D1). Recette : `docs/render-test/assets.md`.
+
+```powershell
+.\tools\dev\setup-render-test.ps1                    # copie le mannequin depuis le moteur, met le cache Fab sur E:, vérifie les assets Fab
+.\tools\dev\setup-render-test.ps1 -VerifyReferences  # + demande à l'éditeur s'il manque des références (éditeur fermé, ~1 min)
+```
+
+**Plugin Fab** (assets Megascans) : **0.0.23**, installé par le lanceur dans `E:\Epic Games\UE_5.8\Engine\Plugins\Fab`
+(117 Mo), actif par défaut dans tous les projets. La compilation C++ du projet passe avec lui (le bug `FabToolset`
+signalé pour la 0.0.22 ne concerne pas la 0.0.23, vérifié le 2026-11-27).
+- *Incident du 2026-11-27* : le lanceur refusait de l'installer (« existing install ») parce qu'un ancien enregistrement
+  pointait vers `C:\Program Files\Epic Games\UE_5.8` (dossier inexistant). Réglé en renommant, lanceur arrêté,
+  `C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests\52E3D1DF6B8DABBF4846C85F5A078A29.item` en `….item.bak`
+  (supprimable une fois la 1.7 finie), puis en réinstallant depuis le lanceur.
+- Pour quitter le lanceur, la croix ne suffit pas : clic droit sur son icône près de l'horloge → « Quitter ».
 
 ## Plan d'installation — Visual Studio 2026 et Docker Desktop (en attente de validation)
 
