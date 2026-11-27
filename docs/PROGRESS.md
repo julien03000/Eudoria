@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-27 (1.7 partie A faite ; ⏸️ point de contrôle A : tableau des assets à valider par le porteur)
+**Dernière mise à jour :** 2026-11-27 (1.7 partie A terminée, 13 assets importés ; ⏸️ point de contrôle A présenté au porteur)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -60,7 +60,21 @@
     grise » du plan n'en était pas une ; D1 reste justifiée par le quota) ; niveaux « Personnelle » et
     « Professionnelle » aux mêmes droits, tous deux à 0 € → « Professionnelle » recommandée. Tailles inconnues avant
     import (non affichées par Fab) ;
-  - **⏸️ point de contrôle A** : le porteur valide le tableau (et le niveau de licence).
+  - liste **validée par le porteur** (licence « Professionnelle ») ; **13 assets importés par le porteur**
+    (M4, M5) : **4 300,9 Mo** dans `unreal/Content/Fab/` (budget 5 Go). `setup-render-test.ps1 -VerifyReferences` :
+    **contenu complet, 0 référence obligatoire manquante, Nanite activé sur les 24 maillages** (le script vérifie
+    désormais Nanite, lu dans le registre des assets sans les charger). `Eudoria.Editor.NoBlueprintLogic` passe sur
+    tout le contenu. `render-test-content.json` complété (13 assets + matériaux partagés du plugin) ; tailles, qualité et
+    dossiers notés dans `docs/render-test/assets.md` ;
+  - **cache Fab resté sur E:** : `E:\Dev\FabCache` = 6 732 Mo ; `%LOCALAPPDATA%\Temp\FabLibrary` **absent** ;
+  - **écart** : qualité **mélangée** — 4 assets en « High » (textures 4K), **9 en « Raw » (textures 8K)**, alors que le
+    plan visait le plus haut niveau hors « Raw ». À trancher au point de contrôle A (garder, ou réimporter en « High »
+    pour une scène homogène) ;
+  - C: a perdu ~1,8 Go pendant l'import sans cause trouvée dans nos outils : seuls ~230 Mo écrits aujourd'hui (traces
+    du Bureau à distance de Windows dans `%LOCALAPPDATA%\Temp\DiagOutputDir`, 109 Mo ; registre d'assets du moteur
+    `%LOCALAPPDATA%\UnrealEngine\5.8\Intermediate\CachedAssetRegistry_*.bin`, 118 Mo). Fichier d'échange (sur E:) : pic
+    de 14,7 Go pendant la session ;
+  - **⏸️ point de contrôle A présenté au porteur** (2026-11-27).
 - **Plan de la sous-étape 1.7 ✅ validé par le porteur le 2026-11-27** (`docs/plans/etape-01-7.md`) : D1 à D8 =
   recommandations, avec deux compléments (§ 11.1) : point ouvert sur les Animation Blueprints / Control Rig ajouté à
   l'ADR-0003 et à la ROADMAP (décision à l'étape 2) ; seconde campagne de mesures identique après le passage à 32 Go
@@ -282,6 +296,10 @@
 - ~~Plugin Fab enregistré vers un dossier inexistant de C:~~ : résolu le 2026-11-27 (0.0.23 sur E:). L'ancien
   enregistrement renommé `…\Manifests\52E3D1DF6B8DABBF4846C85F5A078A29.item.bak` est supprimable à la fin de la 1.7.
 - La limite mémoire WSL (4 Go) s'applique aussi à la distribution Ubuntu déjà présente sur le PC.
+- **Trace sur C: (2026-11-27)** : le moteur garde un registre d'assets en cache dans
+  `%LOCALAPPDATA%\UnrealEngine\5.8\Intermediate\CachedAssetRegistry_*.bin` (118 Mo). Petit ; à surveiller s'il grossit.
+- **Cache du plugin Fab** (`E:\Dev\FabCache`, 6,7 Go) : simple copie des téléchargements, vidable une fois la 1.7 finie
+  (`Fab.ClearCache` dans l'éditeur, décision du porteur).
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
 ## ⏭️ Prochaine étape exacte
@@ -291,9 +309,7 @@
 - *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
   reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Porteur : point de contrôle A** — relire et valider le tableau `docs/render-test/assets.md` (13 assets, licence
-   « Professionnelle » recommandée).
-2. **Ensuite (M4, M5)** : le porteur ajoute les assets à sa bibliothèque sur fab.com et les importe par la fenêtre Fab
-   de l'éditeur ; **commencer par un seul asset** pour mesurer sa taille et prouver que le cache va sur E: ; Claude
-   remplit la liste `render-test-content.json` et le tableau, puis `setup-render-test.ps1 -VerifyReferences`.
-3. **Puis partie B** (scène et personnage en C++).
+1. **Porteur : valider le point de contrôle A**, et trancher la qualité des 9 assets « Raw » (8K) : les garder, ou
+   les réimporter en « High » (4K) pour une scène homogène.
+2. **Claude, ensuite : partie B** (plan 1.7 § 6 et commits 4 à 6 du § 13) — personnage, entrées et animation en C++,
+   carte construite par script Python, entrée depuis « Bienvenue » et menu Échap, avec leurs tests.
