@@ -45,10 +45,11 @@ BENCHMARK_POINTS = [
     (unreal.Vector(0.0, -1500.0, 250.0), (-5.0, 90.0)),     # 1. the clearing towards the cliff (first view)
     (unreal.Vector(1800.0, 200.0, 300.0), (-8.0, 170.0)),   # 2. across the clearing, side light
     (unreal.Vector(-1600.0, 1300.0, 220.0), (-4.0, -15.0)), # 3. along the foot of the cliff
-    (unreal.Vector(300.0, 1700.0, 650.0), (12.0, 95.0)),    # 4. under the overhang, looking up (Lumen bounces)
+    (unreal.Vector(300.0, 900.0, 250.0), (15.0, 95.0)),     # 4. at the foot of the cliff, looking up (Lumen bounces)
     (unreal.Vector(700.0, -300.0, 170.0), (-20.0, 215.0)),  # 5. close-up on rocks, ferns and debris (Nanite detail)
 ]
 CLEAR_RADIUS = 450.0  # around the player start and the benchmark points
+CLEARING_CENTER = (0.0, 0.0)
 
 
 class Builder:
@@ -91,8 +92,12 @@ class Builder:
                 return False
         return True
 
-    def scatter(self, folder, paths, count, radius, area, scale_range, z=0.0, keep_clear=True, sink=0.0):
-        """Places count props at random (fixed seed) in area = (min_x, max_x, min_y, max_y)."""
+    def scatter(self, folder, paths, count, radius, area, scale_range, z=0.0, keep_clear=True, sink=0.0, face_center=False):
+        """Places count props at random (fixed seed) in area = (min_x, max_x, min_y, max_y).
+
+        face_center: for "open" Megascans meshes (scanned from one side only, invisible from behind),
+        turn their scanned side (local +Y, as checked on the granite cliff) towards the clearing.
+        """
         placed = 0
         for _ in range(count * 30):
             if placed >= count:
@@ -103,7 +108,12 @@ class Builder:
             if keep_clear and not self.is_clear(x, y, radius * scale):
                 continue
             path = paths[self.rng.randrange(len(paths))]
-            rotation = unreal.Rotator(roll=self.rng.uniform(-4.0, 4.0), pitch=self.rng.uniform(-4.0, 4.0), yaw=self.rng.uniform(0.0, 360.0))
+            if face_center:
+                towards_center = math.degrees(math.atan2(CLEARING_CENTER[1] - y, CLEARING_CENTER[0] - x))
+                yaw = towards_center - 90.0 + self.rng.uniform(-30.0, 30.0)
+            else:
+                yaw = self.rng.uniform(0.0, 360.0)
+            rotation = unreal.Rotator(roll=self.rng.uniform(-4.0, 4.0), pitch=self.rng.uniform(-4.0, 4.0), yaw=yaw)
             self.spawn_mesh(folder, path, unreal.Vector(x, y, z - sink * scale), rotation, scale)
             if keep_clear:
                 self.placed.append((x, y, radius * scale))
@@ -175,20 +185,23 @@ def build():
             b.spawn_mesh("Ground", MESHES["ground"], unreal.Vector(x, y, -2.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw))
 
     # --- The cliff: three pieces to the north, the middle one leaning over the clearing ------------
-    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(-2400.0, 3000.0, -100.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=8.0), 1.0)
-    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(400.0, 2650.0, -150.0), unreal.Rotator(roll=-14.0, pitch=0.0, yaw=-4.0), 1.15)
-    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(3100.0, 3100.0, -100.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=-20.0), 1.0)
+    # The cliff is an open mesh scanned on its local +Y side: yaw about 180 turns that side south,
+    # towards the clearing (checked on screen on 2026-11-27: at yaw 0 only its back faced the clearing,
+    # and the back of an open mesh is not drawn).
+    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(-2400.0, 3000.0, -100.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=188.0), 1.0)
+    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(400.0, 2650.0, -150.0), unreal.Rotator(roll=14.0, pitch=0.0, yaw=176.0), 1.15)
+    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(3100.0, 3100.0, -100.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=160.0), 1.0)
     for x, y in ((-2400.0, 3000.0), (400.0, 2650.0), (3100.0, 3100.0)):
         b.placed.append((x, y, 1500.0))
 
     # --- Props (fixed seed) ----------------------------------------------------------------------
     clearing = (-4500.0, 4500.0, -4500.0, 2300.0)
-    b.scatter("Rocks", [MESHES["rock_face"]], 8, 180.0, clearing, (1.0, 1.6), sink=20.0)
+    b.scatter("Rocks", [MESHES["rock_face"]], 8, 180.0, clearing, (1.0, 1.6), sink=20.0, face_center=True)
     b.scatter("Rocks", [MESHES["rock_formation"]], 12, 170.0, clearing, (0.9, 1.5), sink=15.0)
     b.scatter("Rocks", [MESHES["boulder"]], 16, 100.0, clearing, (0.8, 1.4), sink=15.0)
-    b.scatter("Rocks", [MESHES["ledge_rock"]], 10, 170.0, clearing, (0.9, 1.4), sink=10.0)
+    b.scatter("Rocks", [MESHES["ledge_rock"]], 10, 170.0, clearing, (0.9, 1.4), sink=10.0, face_center=True)
     b.scatter("Rocks", [MESHES["cluster"]], 30, 110.0, clearing, (0.8, 1.3), sink=10.0)
-    b.scatter("Wood", [MESHES["roots"]], 6, 400.0, clearing, (0.9, 1.2), sink=10.0)
+    b.scatter("Wood", [MESHES["roots"]], 6, 400.0, clearing, (0.9, 1.2), sink=10.0, face_center=True)
     b.scatter("Wood", [MESHES["log"]], 10, 280.0, clearing, (0.9, 1.2))
     b.scatter("Wood", [MESHES["stump"]], 12, 70.0, clearing, (0.9, 1.3), sink=5.0)
     # Small things: allowed close to each other, still away from the viewpoints' feet.

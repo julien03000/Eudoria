@@ -1,5 +1,6 @@
 #include "RenderTest/EudoriaRenderTestGameMode.h"
 
+#include "GameFramework/HUD.h"
 #include "RenderTest/EudoriaRenderTestPlayerController.h"
 #include "RenderTest/EudoriaThirdPersonCharacter.h"
 
@@ -9,5 +10,5 @@ AEudoriaRenderTestGameMode::AEudoriaRenderTestGameMode()
 {
 	DefaultPawnClass = AEudoriaThirdPersonCharacter::StaticClass();
 	PlayerControllerClass = AEudoriaRenderTestPlayerController::StaticClass();
-	HUDClass = nullptr;
+	HUDClass = AHUD::StaticClass(); // empty HUD: no "SpawnActor failed" warning at start
 }

@@ -42,6 +42,32 @@ def main():
             result["enabled"].append(path)
         else:
             result["errors"].append(f"cannot save {path}")
+
+    # A Nanite mesh also needs its materials flagged "Used with Nanite", otherwise the game draws it with
+    # the default material (log: "missing usage flag Nanite"). The flag lives on the base material.
+    result["materialsWithoutNaniteUsage"] = []
+    result["materialsFixed"] = []
+    seen = set()
+    for data in registry.get_assets_by_path(ROOT, recursive=True):
+        if str(data.asset_class_path.asset_name) != "StaticMesh" or str(data.get_tag_value("NaniteEnabled")) != "True":
+            continue
+        mesh = unreal.EditorAssetLibrary.load_asset(str(data.package_name))
+        for slot in mesh.get_editor_property("static_materials"):
+            material = slot.get_editor_property("material_interface")
+            base = material.get_base_material() if material else None
+            if base is None or base.get_path_name() in seen:
+                continue
+            seen.add(base.get_path_name())
+            if base.get_editor_property("used_with_nanite"):
+                continue
+            result["materialsWithoutNaniteUsage"].append(base.get_path_name())
+            if dry_run:
+                continue
+            base.set_editor_property("used_with_nanite", True)
+            if unreal.EditorAssetLibrary.save_loaded_asset(base, only_if_is_dirty=False):
+                result["materialsFixed"].append(base.get_path_name())
+            else:
+                result["errors"].append(f"cannot save {base.get_path_name()}")
     return result
 
 
