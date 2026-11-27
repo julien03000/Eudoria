@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-27 (sous-étape 1.6 ✅ validée ; `start-db.ps1` corrigé ; plan de la 1.7 soumis au porteur)
+**Dernière mise à jour :** 2026-11-27 (plan de la 1.7 ✅ validé ; partie A en cours, en attente de l'action M1 du porteur)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,8 +35,22 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
-- **Plan de la sous-étape 1.7 — Test de rendu rédigé le 2026-11-27, ⏸️ en attente de l'accord du porteur**
-  (`docs/plans/etape-01-7.md`, 8 décisions au § 11). Constats : plugin Fab **pas réellement installé** (enregistré vers
+- **Sous-étape 1.7 — partie A en cours (2026-11-27)** :
+  - fait : contenu local du test ignoré par git (`unreal/Content/Characters/`, `Fab/`, `RenderTest/`) ; recette
+    `docs/render-test/assets.md` ; liste exacte `tools/dev/render-test-content.json` ;
+  - fait : `tools/dev/setup-render-test.ps1` — copie **35 fichiers du mannequin (52,5 Mo)** depuis le moteur, sans
+    `ABP_Unarmed` ni Control Rig ; `-VerifyReferences` demande à l'éditeur (script Python
+    `unreal/Scripts/check_render_test_content.py`) les références manquantes. Il a trouvé un vrai manque (l'espace de
+    mélange utilise 8 directions : 14 animations ajoutées) → **0 référence obligatoire manquante** ; 18 références
+    « souples » sans effet (aperçus vers Quinn, Control Rig non chargé). Testé : copie, deuxième passage (rien à copier),
+    fichier supprimé (recopié), moteur introuvable (erreur claire). `Eudoria.Editor.NoBlueprintLogic` passe avec ce contenu ;
+  - **⏸️ en attente : M1 (porteur, lanceur Epic)** — réinstaller le plugin Fab sur le moteur de E: ; ensuite je
+    recompile aussitôt (bug `FabToolset`, plan § 4.3).
+- **Plan de la sous-étape 1.7 ✅ validé par le porteur le 2026-11-27** (`docs/plans/etape-01-7.md`) : D1 à D8 =
+  recommandations, avec deux compléments (§ 11.1) : point ouvert sur les Animation Blueprints / Control Rig ajouté à
+  l'ADR-0003 et à la ROADMAP (décision à l'étape 2) ; seconde campagne de mesures identique après le passage à 32 Go
+  (`docs/perf/README.md`).
+- Plan de la 1.7 rédigé le 2026-11-27 (8 décisions au § 11). Constats : plugin Fab **pas réellement installé** (enregistré vers
   C:, dossier absent) ; **bug signalé** sur le forum d'Epic (Fab 0.0.22 + UE 5.8.4 du lanceur → compilation C++ cassée,
   `FabToolset`) → vérifié en premier, replis prévus ; Megascans redevenus gratuits sur Fab (05/11/2026, sources
   secondaires, licence à lire sur chaque fiche) ; RX 9060 XT **16 Go** ; le mannequin du moteur contient des Blueprints
@@ -262,7 +276,7 @@
 - *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
   reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Porteur : relire le plan de la 1.7** (`docs/plans/etape-01-7.md`), trancher les décisions D1 à D8 (§ 11) et
-   donner son « OK ».
-2. **Claude, après cet OK :** partie A — guider M1 (réinstallation du plugin Fab), puis **recompiler aussitôt** pour
-   détecter le bug `FabToolset` (§ 4.3), puis cache sur E: et tableau des assets à valider (§ 5.1).
+1. **Porteur : M1** (plan 1.7 § 4.1 et § 10) — dans le lanceur Epic, retirer puis réinstaller le plugin Fab sur le
+   moteur 5.8 ; et M2 : cache « Vault » du lanceur vers `E:\Dev\EpicVaultCache` si l'option existe. Éditeur fermé.
+2. **Claude, ensuite :** vérifier l'emplacement du plugin, **recompiler aussitôt** (bug `FabToolset`, § 4.3), puis
+   cache de Fab sur E: (M3) avec preuve, puis tableau des assets à faire valider (§ 5.1) → point de contrôle A.
