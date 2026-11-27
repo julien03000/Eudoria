@@ -394,4 +394,7 @@ unreal/
   `tools/dev/setup-render-test.ps1` les remet en place ou dit ce qui manque, d'après `tools/dev/render-test-content.json`
   (liste exacte) ; il règle aussi le cache du plugin Fab sur E:. Avec `-VerifyReferences`, il lance
   `unreal/Scripts/check_render_test_content.py` dans l'éditeur sans fenêtre (références manquantes, résultat en JSON
-  dans `Saved/RenderTest/`). Recette lisible : `docs/render-test/assets.md`.
+  dans `Saved/RenderTest/`). Recette lisible : `docs/render-test/assets.md`. Il vérifie aussi un seul niveau de qualité
+  par asset Fab, l'absence de texture 8K et Nanite sur chaque maillage Fab. Scripts d'entretien du contenu Fab (éditeur
+  fermé, passage à blanc par défaut) : `unreal/Scripts/remove_fab_quality_tier.py` (supprime un niveau de qualité
+  inutilisé, par l'éditeur, seulement si rien d'autre ne le référence) et `unreal/Scripts/enable_fab_nanite.py`.
