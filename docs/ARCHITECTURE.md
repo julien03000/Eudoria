@@ -397,4 +397,17 @@ unreal/
   dans `Saved/RenderTest/`). Recette lisible : `docs/render-test/assets.md`. Il vérifie aussi un seul niveau de qualité
   par asset Fab, l'absence de texture 8K et Nanite sur chaque maillage Fab. Scripts d'entretien du contenu Fab (éditeur
   fermé, passage à blanc par défaut) : `unreal/Scripts/remove_fab_quality_tier.py` (supprime un niveau de qualité
-  inutilisé, par l'éditeur, seulement si rien d'autre ne le référence) et `unreal/Scripts/enable_fab_nanite.py`.
+  inutilisé, par l'éditeur, seulement si rien d'autre ne le référence) et `unreal/Scripts/enable_fab_nanite.py`
+  (Nanite sur les maillages, réglage « utilisé avec Nanite » sur leurs matériaux).
+- **Scène de test de rendu (1.7)** — module `Eudoria`, dossier `RenderTest/` :
+  - `EudoriaLocomotion` (fonctions pures : état sol / saut / chute / réception, position dans l'espace de mélange),
+    `UEudoriaRenderTestInput` (touches construites en C++, aucune ressource d'entrée), `UEudoriaRenderTestSettings`
+    (chemins des assets dans `DefaultGame.ini`), `EudoriaRenderTestFlow` (règles pures d'entrée et de sortie) ;
+  - `AEudoriaThirdPersonCharacter` (troisième personne, animation en nœud unique pilotée par le C++, sans Animation
+    Blueprint), `AEudoriaRenderTestPlayerController` (entrées de jeu, menu Échap `UEudoriaPauseMenu`, retour au
+    front-end), `AEudoriaRenderTestGameMode` (posé sur la carte par le script) ;
+  - entrée depuis « Bienvenue » (`OpenLevel`) : la session vit dans le `GameInstance` et survit au changement de
+    carte ; au retour, le front-end montre « Bienvenue » si la session est ouverte ;
+  - carte construite par `unreal/Scripts/build_render_test_map.py` (graine fixe), qui mesure chaque maillage avec
+    `fab_mesh_geometry.py` pour ne jamais montrer le dos d'un scan ouvert (murs invisibles autour de la zone de jeu) ;
+  - la scène reste à la troisième personne : la vue du jeu sera à la première personne (ADR-0008).

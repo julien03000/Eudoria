@@ -187,9 +187,18 @@ Notes :
 Ce contenu n'est **pas dans le dépôt** (plan 1.7, décision D1). Recette : `docs/render-test/assets.md`.
 
 ```powershell
-.\tools\dev\setup-render-test.ps1                    # copie le mannequin depuis le moteur, met le cache Fab sur E:, vérifie les assets Fab
-.\tools\dev\setup-render-test.ps1 -VerifyReferences  # + demande à l'éditeur s'il manque des références (éditeur fermé, ~1 min)
+.\tools\dev\setup-render-test.ps1                    # copie le mannequin depuis le moteur, met le cache Fab sur E:, vérifie les assets Fab et la carte
+.\tools\dev\setup-render-test.ps1 -BuildMap          # (re)construit la carte de test (éditeur fermé, ~15 s)
+.\tools\dev\setup-render-test.ps1 -VerifyReferences  # + demande à l'éditeur s'il manque des références, vérifie Nanite (éditeur fermé, ~1 min)
 ```
+
+Après un **nouvel import** d'assets Fab, lancer aussi `unreal/Scripts/enable_fab_nanite.py` (éditeur fermé ; passage à
+blanc par défaut, `EUDORIA_DRY_RUN=0` pour appliquer) : le plugin n'active pas toujours Nanite, ni le réglage « utilisé
+avec Nanite » des matériaux (sans lui, le jeu dessine l'objet avec un matériau par défaut).
+
+**Voir la scène sans se connecter** (pour vérifier le rendu) :
+`UnrealEditor.exe unreal\Eudoria.uproject /Game/RenderTest/L_RenderTest -game -windowed`, avec
+`"-ExecCmds=BugItGo x y z tangage lacet 0"` pour placer le personnage à un endroit précis (commande de développement).
 
 **Plugin Fab** (assets Megascans) : **0.0.23**, installé par le lanceur dans `E:\Epic Games\UE_5.8\Engine\Plugins\Fab`
 (117 Mo), actif par défaut dans tous les projets. La compilation C++ du projet passe avec lui (le bug `FabToolset`

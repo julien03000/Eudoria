@@ -278,6 +278,56 @@ D1 à D8 : **recommandations retenues**. Deux compléments :
 Aucune nouvelle librairie. Outils et contenus : plugin **Fab** d'Epic (déjà prévu par la ROADMAP), **assets Megascans**
 gratuits (licence par fiche), **contenu du moteur** (mannequin). Rien d'installé sans ton accord (M1).
 
+## 15. Partie A — réalisation (2026-11-27)
+
+Détail : `docs/render-test/assets.md` (import, mesures) et `docs/PROGRESS.md`. En bref : plugin Fab 0.0.23 sur E: (la
+compilation C++ passe ; le bug `FabToolset` ne touche que la 0.0.22), cache Fab sur E: (réglage écrit par script,
+relu par l'éditeur ; `FabLibrary` jamais créé sur C:), 13 assets en « High » (1,3 Go), Nanite partout, mannequin
+copié depuis le moteur (sans Animation Blueprint), scripts de vérification et d'entretien.
+
+## 16. Partie B — réalisation et écarts (2026-11-27)
+
+**Livré** (commits 4 à 6 du § 13, plus deux commits de correction) :
+- personnage à la troisième personne en C++ (`AEudoriaThirdPersonCharacter`) : marche 300 cm/s et course 600 cm/s,
+  **exactement les vitesses des échantillons** de l'espace de mélange (lu dans l'asset : axes direction −180…180 et
+  vitesse 0…600), donc pas de glissement des pieds ; animation en **nœud unique pilotée par le C++** (logique pure
+  `EudoriaLocomotion` : sol / saut / chute / réception, position dans l'espace de mélange), aucune Animation Blueprint ;
+- entrées construites en C++ à l'exécution (ZQSD, flèches, souris, manette ; Échap / Start pour le menu) : aucun
+  `.uasset` d'entrée ;
+- carte construite par `unreal/Scripts/build_render_test_map.py` (graine fixe 1707) : sol, falaise, 76 rochers ou
+  bois, 260 fougères, 160 débris, 4 murs invisibles, 5 points de vue de mesure, mode de jeu de la carte ; Lumen et
+  Nanite écrits dans `DefaultEngine.ini` ;
+- bouton « Entrer dans la scène de test » sur « Bienvenue » (grisé, avec la commande à lancer, si le contenu manque) ;
+  menu Échap (Reprendre, Retour à l'accueil, Se déconnecter) ; au retour, « Bienvenue » si la session est ouverte ;
+- **tests** : 7 tests `Eudoria.RenderTest.*` (états de l'animation, position dans l'espace de mélange, touches et sens
+  de chaque touche, réglages, personnage dans un monde jetable avec le vrai maillage, règles d'entrée et de sortie,
+  contenu réel de la carte : 1 départ, 5 points de vue, objets Fab tous Nanite) ; **45 tests Unreal passent**, dont les
+  4 d'intégration avec le noyau ; 3 mutations détectées (touche Q, réception interrompue, retour vers « Bienvenue ») ;
+- **essai à l'écran** : vérifié par moi (captures de la seule fenêtre du jeu, scène ouverte directement avec
+  `BugItGo`), puis par le porteur : rendu jugé très réaliste, déplacements, animations et shaders corrects.
+
+**Écarts et défauts trouvés en route :**
+- **maillages « ouverts »** : beaucoup de scans Megascans n'ont qu'une face ; vus de dos, ils sont invisibles (la
+  falaise entière l'était au premier lancement). Solution, à la demande du porteur, **sans matériau « deux faces »** :
+  `unreal/Scripts/fab_mesh_geometry.py` **mesure** chaque maillage (arêtes de bord, après fusion des sommets dédoublés
+  par les coutures de texture) et le classe : fermé, ouvert en dessous (bord enfoui, aucune inclinaison), ouvert sur un
+  côté (falaise, paroi, corniche, racines : **seulement dos à un mur invisible** de la zone de jeu, le dos 20 cm dans le
+  mur ; le script refuse de les semer ailleurs), feuillage à matériau deux faces d'origine (fougère). La zone de jeu
+  passe de 100 × 100 m à **67 × 61 m** ; les murs arrêtent aussi la caméra ; les bouts de la falaise dépassent des murs.
+  Vérifié sur 6 vues piégeuses (le long de chaque mur, de biais, depuis un coin) ;
+- la fougère en « High » : matériau sans le réglage « utilisé avec Nanite » → matériau par défaut en jeu ; corrigé par
+  `enable_fab_nanite.py` sur les 4 matériaux de base Fab ;
+- avertissement « SpawnActor failed » au démarrage de la scène (aucune classe d'interface) → interface vide d'Unreal ;
+- Unreal 5.8 a renommé `volumetric_fog` (→ `enable_volumetric_fog`) ; l'éditeur refuse de recréer une carte existante :
+  `setup-render-test.ps1 -BuildMap` vide le dossier généré avant et après un échec (une carte à moitié construite ne
+  passe jamais pour la bonne) ;
+- **intégration au lieu d'un test « charge la carte et joue »** prévu au § 8 : un test automatique ne peut pas
+  posséder un personnage hors du jeu ; il est remplacé par le test du contenu réel de la carte, le test du personnage
+  dans un monde jetable, et l'essai à l'écran ;
+- le **sens de la souris** (haut/bas) reste à confirmer par le porteur (pas d'inversion signalée lors de son essai) ;
+- **décision du porteur pendant la partie B : ADR-0008** (première personne sur PC comme en VR) ; la scène de test
+  reste à la troisième personne.
+
 ## Sources consultées
 - Forum Epic, bug `FabToolset` avec Fab 0.0.22 / UE 5.8.4 :
   https://forums.unrealengine.com/t/ue-5-8-4-launcher-install-c-build-fails-with-ruleserror-fabtoolset-after-fab-plugin-0-0-22-is-installed/2846815

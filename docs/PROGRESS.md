@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-27 (1.7 partie A terminée, 13 assets en « High » ; ⏸️ point de contrôle A présenté au porteur)
+**Dernière mise à jour :** 2026-11-27 (1.7 partie B terminée et vérifiée par le porteur ; ADR-0008 « Accepté » ; partie C à venir)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,7 +35,25 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
-- **Sous-étape 1.7 — partie A en cours (2026-11-27)** :
+- **Sous-étape 1.7 — partie B ✅ faite (2026-11-27)**, essai du porteur : « rendu très réaliste, déplacements,
+  animations et shaders OK » (détail et écarts : `docs/plans/etape-01-7.md` § 16) :
+  - personnage à la troisième personne en C++ (marche 300 / course 600 cm/s = vitesses des animations), animation en
+    nœud unique pilotée par le C++ (aucune Animation Blueprint), touches construites en C++ (ZQSD, flèches, souris,
+    manette) ; bouton « Entrer dans la scène de test » sur « Bienvenue » ; menu Échap (Reprendre, Retour à l'accueil,
+    Se déconnecter) ; carte construite par script (graine fixe) ; Lumen et Nanite écrits dans `DefaultEngine.ini` ;
+  - **45 tests Unreal passent** (7 nouveaux `Eudoria.RenderTest.*`), dont les 4 d'intégration avec le noyau ;
+    3 mutations détectées ; 0 avertissement dans notre code ;
+  - défauts trouvés et corrigés : **maillages scannés « ouverts » invisibles de dos** (la falaise entière, puis
+    quelques rochers signalés par le porteur) → chaque maillage est **mesuré** (`fab_mesh_geometry.py`) et placé selon
+    son type : bord enfoui, ou dos contre un **mur invisible** de la zone de jeu (67 × 61 m), sans matériau « deux
+    faces » (demande du porteur) ; fougère dessinée avec un matériau par défaut (réglage « utilisé avec Nanite »
+    manquant) ; avertissement d'interface au démarrage ;
+  - **décision du porteur : ADR-0008 « Caméra et corps du joueur » (Accepté)** — première personne sur PC comme en VR,
+    corps visible (tête masquée pour le joueur seul, ombre comprise), caméra à la tête, IK du corps entier en VR ;
+    conséquences reportées dans l'ADR-0003 (point ouvert Animation Blueprints renforcé), la ROADMAP (étape 2 : critères
+    de l'évaluation de l'avatar ; étape 4 : question du **confort en VR** — téléportation ou déplacement continu,
+    rotation par crans) et `CLAUDE.md`. La scène de test reste à la troisième personne.
+- **Sous-étape 1.7 — partie A faite (2026-11-27)** :
   - fait : contenu local du test ignoré par git (`unreal/Content/Characters/`, `Fab/`, `RenderTest/`) ; recette
     `docs/render-test/assets.md` ; liste exacte `tools/dev/render-test-content.json` ;
   - fait : `tools/dev/setup-render-test.ps1` — copie **35 fichiers du mannequin (52,5 Mo)** depuis le moteur, sans
@@ -315,6 +333,8 @@
 - *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
   reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Porteur : valider le point de contrôle A** (13 assets en « High », 1,3 Go, Nanite partout).
-2. **Claude, ensuite : partie B** (plan 1.7 § 6 et commits 4 à 6 du § 13) — personnage, entrées et animation en C++,
-   carte construite par script Python, entrée depuis « Bienvenue » et menu Échap, avec leurs tests.
+1. **Porteur (rapide)** : revérifier la scène après la correction des maillages ouverts (aucun objet ne doit
+   disparaître quand on tourne autour) ; confirmer le sens de la souris (haut = regarder en haut).
+2. **Claude : partie C — mesures** (plan 1.7 § 7 et commits 7 à 9 du § 13) : parcours de mesure automatique (5 points
+   de vue + trajet, touche F8), `tools/dev/measure-render.ps1`, version empaquetée « Development » sur E:, campagne 1
+   (16 Go) notée dans `docs/perf/`, puis section « Validation » de l'ADR-0003.
