@@ -100,7 +100,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
 - [x] Le mot de passe n'apparaît en clair ni en base, ni dans les logs. *(1.2 à 1.4, tests des journaux + lancement réel)*
 - [x] Un jeton expiré ou falsifié est refusé par l'API. *(1.3)*
 - [x] Après déconnexion, le jeton de renouvellement ne fonctionne plus. *(1.3 ; et « tout déconnecter » coupe aussi les jetons d'accès, 1.4)*
-- [x] Un composant tiers (simulé dans les tests) peut vérifier un jeton et obtenir l'identifiant du compte. *(1.6 A, 2026-11-26 : ticket d'entrée vérifié par un vérificateur .NET sans lien avec le noyau, même UUID que `/me` ; ADR-0007 « Accepté » le 2026-11-26 ; vérificateur C++ en 1.6 B)*
+- [x] Un composant tiers (simulé dans les tests) peut vérifier un jeton et obtenir l'identifiant du compte. *(1.6 A, 2026-11-26 : ticket d'entrée vérifié par un vérificateur .NET sans lien avec le noyau, même UUID que `/me` ; ADR-0007 « Accepté » le 2026-11-26 ; vérificateur C++ `EudoriaCore` en 1.6 B, validé le 2026-11-27 : mêmes verdicts que le .NET sur les 50 jeux d'essai)*
 - [ ] Après connexion, la scène de test (Lumen + Nanite, assets Fab) tourne de façon **fluide en qualité Haute** sur le poste du porteur, et les mesures (images/s, mémoire vidéo, RAM) sont notées dans `docs/`.
 - [ ] Les tests passent, sans erreur de compilation ni de lint. *(noyau : 364 tests ; client Unreal : 38 tests (1.6 B), 0 avertissement dans notre code (1.5) ; à revérifier à la fin de l'étape, après 1.6 et 1.7)*
 - [x] Tout se lance en local en suivant une procédure écrite de quelques commandes. *(noyau et client : `docs/SETUP.md` + scripts `tools/dev/`, 1.5)*
@@ -115,7 +115,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
    - **garder la capture des courses** (refus d'unicité de PostgreSQL lors d'inscriptions simultanées → mêmes réponses) ;
    - **supprimer l'erreur EF Core des journaux** pour un e-mail déjà utilisé (cas normal, pas une panne).
 5. Création du projet Unreal (C++, plugin socle, Git LFS) et client minimal. ✅ *(validée le 2026-11-25)*
-6. Vérification de jeton par un service tiers. 🟡 *(parties A (validée) et B faites le 2026-11-26 ; contrôle de la B par le porteur en attente)*
+6. Vérification de jeton par un service tiers. ✅ *(parties A et B validées par le porteur, le 2026-11-26 et le 2026-11-27)*
    Les serveurs de monde ne reçoivent jamais le jeton d'accès du noyau : le noyau délivre un ticket d'entrée de
    courte durée, avec une audience propre à chaque monde. Il faut concevoir ce mécanisme en 1.6.
    (Décision du porteur, 2026-11-24 : le jeton d'accès porte l'audience `eudoria-core` et n'est accepté que par le noyau.)

@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-26 (1.6 partie B réalisée, en attente du contrôle du porteur)
+**Dernière mise à jour :** 2026-11-27 (sous-étape 1.6 ✅ validée ; `start-db.ps1` corrigé)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,7 +35,13 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
-- **Sous-étape 1.6 — partie B (C++) réalisée le 2026-11-26, ⏸️ en attente du contrôle du porteur** (détail et écarts :
+- **`start-db.ps1` corrigé (2026-11-27)** : lancé avec sa sortie redirigée (`*>`), il échouait sur le message normal de
+  Docker « Container … Running » (PowerShell 5.1 change chaque ligne de stderr en erreur). La sortie de Docker est
+  désormais convertie en texte, et seul le code de retour décide de l'échec. Vérifié à la main (pas de suite de tests
+  pour les scripts) : défaut reproduit avec l'ancienne version ; nouvelle version, sortie redirigée ou non → démarrage
+  (base arrêtée ou déjà lancée) et arrêt réussis ; Docker injoignable → toujours une erreur claire.
+- **Sous-étape 1.6 ✅ validée par le porteur le 2026-11-27** (parties A et B).
+- **Sous-étape 1.6 — partie B (C++) réalisée le 2026-11-26, ✅ validée par le porteur le 2026-11-27** (détail et écarts :
   `docs/plans/etape-01-6.md` § 19) : vérificateur de tickets C++ dans `EudoriaCore` (OpenSSL du moteur, code serveur
   seulement), **mêmes verdicts que le .NET sur les 50 jeux d'essai partagés** ; `FEudoriaSession::RequestEntryTicket` ;
   bout en bout Unreal ↔ noyau réussi (même UUID que `/me`) ; **38 tests Unreal** et **364 tests .NET** passent ;
@@ -245,16 +251,10 @@
 
 ## ⏭️ Prochaine étape exacte
 - *Non bloquant, quand le PC est au repos :* refaire les mesures de durée de la 1.4 (voir « Problèmes connus »).
-- **ROADMAP :** 9 critères de l'étape 1 sur 11 cochés (1.1 à 1.5, + vérification par un tiers en 1.6 A).
-- *Petit défaut connu, non bloquant :* `start-db.ps1` lancé avec toute sa sortie redirigée (`*>`, comme le fait Claude)
-  échoue sur le message normal de Docker « Container … Running » (PowerShell 5.1 le prend pour une erreur). Sans effet
-  quand le porteur lance le script lui-même. Correction possible (petit changement) : à proposer au porteur.
+- **ROADMAP :** 9 critères de l'étape 1 sur 11 cochés ; sous-étapes 1.1 à 1.6 validées. Restent la scène de rendu (1.7)
+  et « les tests passent » (à revérifier en fin d'étape).
 - *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
   reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Porteur : contrôler la partie B de la 1.6** — relire le § 19 du plan (résultats et écarts, dont les deux défauts
-   .NET corrigés) ; rien à lancer à la main. Sa validation clôt la sous-étape 1.6.
-2. **Claude, après cette validation : sous-étape 1.7 — Test de rendu** (ROADMAP) : commencer par **un plan** (scène après
-   connexion, troisième personne en C++, Lumen + Nanite, assets Fab gratuits, mesures notées dans `docs/`, validation de
-   l'ADR-0003) à soumettre au porteur. Prérequis connu : réinstaller le plugin Fab sur le moteur de E: (voir « Problèmes
-   connus »).
+1. **Claude : rédiger le plan de la sous-étape 1.7 — Test de rendu** (`docs/plans/etape-01-7.md`) et le soumettre au
+   porteur. Prérequis connu : réinstaller le plugin Fab sur le moteur de E: (voir « Problèmes connus »).
