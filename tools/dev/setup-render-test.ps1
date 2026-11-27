@@ -96,13 +96,27 @@ foreach ($asset in $fab) {
     }
     $size = (Get-ChildItem -LiteralPath $folder -Recurse -File | Measure-Object Length -Sum).Sum
     Write-Host ("Fab: {0} present ({1})" -f $asset.name, (Format-Size $size))
+
+    # Megascans assets: exactly one quality tier, the one of the manifest (the Fab plugin keeps the
+    # previous tier beside a new import: plan 1.7, Raw tiers removed on 2026-11-27).
+    if ($asset.folder -like 'Fab/Megascans/*') {
+        $tiers = @(Get-ChildItem -LiteralPath $folder -Directory | ForEach-Object Name)
+        if ($tiers.Count -ne 1 -or $tiers[0] -ne $manifest.fabQualityTier) {
+            $problems.Add("Fab asset '$($asset.name)': quality tiers [$($tiers -join ', ')], expected only '$($manifest.fabQualityTier)'. Remove the extra tier with unreal/Scripts/remove_fab_quality_tier.py.")
+        }
+    }
 }
+
+# No 8K texture: they are the "Raw" tier (about 4 times the video memory of a 4K one).
+$oversized = @(Get-ChildItem -LiteralPath (Join-Path $script:RepoRoot 'unreal\Content') -Recurse -File -Filter '*_8K_*')
+foreach ($file in $oversized) { $problems.Add("8K texture found: $($file.FullName)") }
 
 # --- Optional: missing references, asked to the editor -------------------------------------------
 if ($VerifyReferences) {
     Assert-EudoriaEditorClosed
     $editorCmd = Get-EudoriaEnginePath 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-    $script = Join-Path $script:RepoRoot 'unreal\Scripts\check_render_test_content.py'
+    # Forward slashes: the editor's command line reads "\r", "\n"... in a path as escape sequences.
+    $script = (Join-Path $script:RepoRoot 'unreal\Scripts\check_render_test_content.py') -replace '\\', '/'
     $resultFile = Join-Path $script:RepoRoot 'unreal\Saved\RenderTest\content-check.json'
     $logFile = Join-Path $script:RepoRoot 'unreal\Saved\Logs\EudoriaRenderTestContent.log'
     if (Test-Path -LiteralPath $resultFile) { Remove-Item -LiteralPath $resultFile -Force }
