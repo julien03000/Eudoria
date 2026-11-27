@@ -86,6 +86,9 @@ Validée le 2026-11-24 (ADR « Accepté » dans `docs/decisions/`) :
   **ticket d'entrée** (JWT ES256, `typ: eudoria-entry+jwt`, audience `eudoria-world:<id>`, 60 s, usage unique) signé
   par une **clé distincte** dont la partie publique est publiée en JWKS ; le monde le vérifie **seul, par sa signature**,
   sans appeler le noyau. Le jeton d'accès (`typ: eudoria-access+jwt`) n'est accepté que par le noyau — ADR-0007.
+- **Caméra et corps du joueur** (validé le 2026-11-27, décision du porteur) : **première personne sur PC comme en VR** ;
+  le joueur voit son propre corps (tête masquée pour lui seul, ombre comprise) ; caméra attachée à la tête ; IK du corps
+  entier en VR. La scène de test de la 1.7 reste à la troisième personne (mesure du rendu) — ADR-0008.
 
 ## Environnement
 - **Règle d'installation : tout sur E:.** Le disque C: n'a qu'environ 50 Go libres ; seuls les composants

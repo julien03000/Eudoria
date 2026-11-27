@@ -121,7 +121,7 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
    Les serveurs de monde ne reçoivent jamais le jeton d'accès du noyau : le noyau délivre un ticket d'entrée de
    courte durée, avec une audience propre à chaque monde. Il faut concevoir ce mécanisme en 1.6.
    (Décision du porteur, 2026-11-24 : le jeton d'accès porte l'audience `eudoria-core` et n'est accepté que par le noyau.)
-7. Test de rendu : scène de test après connexion (troisième personne en C++, Lumen, Nanite, assets Fab gratuits), mesures de performances notées dans `docs/`, validation de l'ADR-0003.
+7. Test de rendu : scène de test après connexion (troisième personne en C++, Lumen, Nanite, assets Fab gratuits), mesures de performances notées dans `docs/`, validation de l'ADR-0003. 🟡 *(parties A et B faites le 2026-11-27 ; partie C — mesures — à faire)*
 
 ---
 
@@ -133,6 +133,9 @@ personnalisation possible **par le joueur, dans le jeu** (et pas seulement dans 
 coût en performances avec plusieurs avatars à l'écran, déclinaison VR/mobile (niveaux de détail bas),
 taille des assets (impact sur le quota Git LFS, ADR-0005), conditions de licence ; et, si MetaHuman ne
 convient pas, alternatives.
+**Vue à la première personne (ADR-0008, décision du porteur du 2026-11-27) :** l'évaluation vérifie aussi la vue de
+son propre corps (tête masquée pour le joueur seul, ombre conservée, pas de trou au cou), le coût d'un avatar complet
+toujours rendu pour le joueur local, et la compatibilité avec l'IK du corps entier en VR.
 **Point ouvert à trancher dans cette évaluation (ajouté par le porteur le 2026-11-27, ADR-0003 « Points ouverts ») :**
 les Animation Blueprints et Control Rig sont l'outil standard pour un avatar réaliste (transitions, IK des pieds,
 visage). La règle « aucune logique Blueprint » devra être précisée pour eux (ex. logique dans une classe C++
@@ -158,6 +161,12 @@ traiter les noms « sosies » (caractères qui se ressemblent d'un alphabet à l
 **Objectif :** se déplacer et interagir de façon fluide, avec le **serveur qui fait autorité**.
 **Livrable :** déplacement à pied synchronisé (prédiction côté client, correction serveur), discussion textuelle de proximité, interactions simples (emotes, objets).
 **Validation :** déplacements fluides avec latence simulée ; une triche de vitesse côté client est corrigée par le serveur.
+**Caméra (ADR-0008, décision du porteur du 2026-11-27) :** première personne sur PC comme en VR ; le joueur voit son
+propre corps en regardant vers le bas (tête masquée pour lui seul, ombre comprise). Les déplacements et la
+synchronisation réseau portent aussi la pose de la tête (et des mains en VR).
+**Question ouverte — confort en VR** (à trancher dans cette étape) : **téléportation ou déplacement continu** (ou les
+deux, au choix du joueur), et **rotation par crans** (« snap turn ») ou continue ; options de réduction du mal des
+transports (vignette pendant le mouvement, etc.).
 **En fin d'étape :** test d'export sur Meta Quest / Android, pour mesurer tôt le coût du rendu sur ces plateformes (ADR-0003).
 À ce moment-là : **réactiver le plugin `AndroidFileServer`** dans `unreal/Eudoria.uproject` (désactivé le 2026-11-25,
 sous-étape 1.5) et **garder son jeton hors du dépôt** : l'éditeur écrit un `SecurityToken` aléatoire dans

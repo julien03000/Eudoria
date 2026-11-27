@@ -132,6 +132,7 @@ Epic ne publie pas de chiffres officiels par option, et les témoignages montren
   dans les graphes Blueprint ») devra être **précisée pour eux** — par exemple : toute la logique dans une classe C++
   dérivée d'`AnimInstance`, et le graphe d'animation autorisé pour le seul assemblage des poses. **Décision du porteur
   à l'étape 2** (évaluation de MetaHuman). D'ici là, la scène de test de la 1.7 anime le personnage en C++
-  (mode « nœud unique », sans graphe ni IK).
+  (mode « nœud unique », sans graphe ni IK). **Renforcé par l'ADR-0008** (première personne, corps visible, IK du corps
+  entier en VR) : cette précision devient une condition de l'étape 2.
 - **Validation sur le poste du porteur** : mesures de la sous-étape 1.7 (`docs/perf/`), à ajouter ici une fois faites ;
   seconde campagne identique prévue après le passage à 32 Go de RAM.
