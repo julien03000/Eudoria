@@ -14,7 +14,12 @@
     .\tools\dev\setup-render-test.ps1 -VerifyReferences   # also ask the editor for missing references (editor closed, ~1-3 min)
 #>
 [CmdletBinding()]
-param([switch]$VerifyReferences)
+param(
+    [switch]$VerifyReferences,
+    # Download cache of the Fab plugin. Its default is %LOCALAPPDATA%\Temp\FabLibrary (on C:): the
+    # "everything on E:" rule moves it. The setting is per project and per user (Saved/, not versioned).
+    [string]$FabCacheDirectory = 'E:\Dev\FabCache'
+)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Unreal.ps1')
@@ -48,6 +53,35 @@ foreach ($relative in $manifest.mannequin.files) {
 }
 Write-Host ("Mannequin: {0} files ({1}), {2} copied, {3} already in place -> {4}" -f `
     @($manifest.mannequin.files).Count, (Format-Size $total), $copied, (@($manifest.mannequin.files).Count - $copied), $destinationRoot)
+
+# --- Fab plugin: download cache on E: --------------------------------------------------------------
+# UFabSettings (config = EditorPerProjectUserSettings), property CacheDirectoryPath (an FDirectoryPath),
+# read from the Fab 0.0.23 plugin. The editor rewrites this file when it closes: it must be closed now.
+function Set-EudoriaFabCacheDirectory([string]$directory) {
+    Assert-EudoriaEditorClosed
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $iniPath = Join-Path $script:RepoRoot 'unreal\Saved\Config\WindowsEditor\EditorPerProjectUserSettings.ini'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $iniPath) | Out-Null
+    $section = '[/Script/Fab.FabSettings]'
+    $line = 'CacheDirectoryPath=(Path="{0}")' -f ($directory -replace '\\', '/')
+    $lines = if (Test-Path -LiteralPath $iniPath) { @(Get-Content -LiteralPath $iniPath -Encoding UTF8) } else { @() }
+
+    $start = [array]::IndexOf($lines, $section)
+    if ($start -lt 0) {
+        $lines += @('', $section, $line)
+    } else {
+        $end = $start + 1
+        while ($end -lt $lines.Count -and -not $lines[$end].StartsWith('[')) { $end++ }
+        $kept = @($lines[($start + 1)..($end - 1)] | Where-Object { $_ -notmatch '^CacheDirectoryPath=' -and $_ -ne '' })
+        $before = if ($start -gt 0) { $lines[0..($start - 1)] } else { @() }
+        $after = if ($end -lt $lines.Count) { $lines[$end..($lines.Count - 1)] } else { @() }
+        $lines = @($before) + @($section, $line) + $kept + @('') + @($after)
+    }
+    # UTF-8 without BOM, like the files the editor writes.
+    [IO.File]::WriteAllLines($iniPath, [string[]]$lines, (New-Object System.Text.UTF8Encoding $false))
+    Write-Host "Fab cache: $directory (written to $iniPath)"
+}
+Set-EudoriaFabCacheDirectory $FabCacheDirectory
 
 # --- Fab assets: check only ----------------------------------------------------------------------
 $fab = @($manifest.fab)
