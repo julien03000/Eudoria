@@ -11,7 +11,7 @@ import os
 
 import unreal
 
-CHECKED_ROOTS = ["/Game/Characters", "/Game/Fab"]
+CHECKED_ROOTS = ["/Game/Characters", "/Game/Fab", "/Game/RenderTest"]
 
 
 def package_exists(registry, package_name):

@@ -7,14 +7,17 @@
     - Mannequin: copied from the engine install (no download), only the files listed in the manifest
       (no Animation Blueprint, no Control Rig: plan 1.7, decision D3).
     - Fab assets: added by hand in the editor; this script only checks that they are there.
+    - The test map: built by unreal/Scripts/build_render_test_map.py (-BuildMap), always the same scene.
     Exit code 0 when everything is present (and, with -VerifyReferences, no hard reference is missing),
     1 otherwise.
 .EXAMPLE
-    .\tools\dev\setup-render-test.ps1                     # copy the mannequin, check the Fab assets
+    .\tools\dev\setup-render-test.ps1                     # copy the mannequin, check the Fab assets and the map
+    .\tools\dev\setup-render-test.ps1 -BuildMap           # (re)build the test map (editor closed, a few minutes)
     .\tools\dev\setup-render-test.ps1 -VerifyReferences   # also ask the editor for missing references (editor closed, ~1-3 min)
 #>
 [CmdletBinding()]
 param(
+    [switch]$BuildMap,
     [switch]$VerifyReferences,
     # Download cache of the Fab plugin. Its default is %LOCALAPPDATA%\Temp\FabLibrary (on C:): the
     # "everything on E:" rule moves it. The setting is per project and per user (Saved/, not versioned).
@@ -29,6 +32,25 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | Convert
 $problems = New-Object System.Collections.Generic.List[string]
 
 function Format-Size([long]$bytes) { '{0:N1} MB' -f ($bytes / 1MB) }
+
+# Runs one of our editor Python scripts headless and returns the JSON it writes in Saved/RenderTest
+# (the commandlet's exit code says nothing about the script itself).
+function Invoke-EudoriaEditorPython([string]$scriptName, [string]$resultName) {
+    Assert-EudoriaEditorClosed
+    $editorCmd = Get-EudoriaEnginePath 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+    # Forward slashes: the editor's command line reads "\r", "\n"... in a path as escape sequences.
+    $scriptPath = (Join-Path $script:RepoRoot "unreal\Scripts\$scriptName") -replace '\\', '/'
+    $resultFile = Join-Path $script:RepoRoot "unreal\Saved\RenderTest\$resultName"
+    $logFile = Join-Path $script:RepoRoot ("unreal\Saved\Logs\EudoriaRenderTest-{0}.log" -f [IO.Path]::GetFileNameWithoutExtension($scriptName))
+    if (Test-Path -LiteralPath $resultFile) { Remove-Item -LiteralPath $resultFile -Force }
+    & $editorCmd $script:UProject '-run=pythonscript' "-script=$scriptPath" '-unattended' '-nullrhi' '-nosplash' `
+        '-nosound' '-nop4' "-abslog=$logFile" | Out-Null
+    if (-not (Test-Path -LiteralPath $resultFile)) {
+        $problems.Add("$scriptName produced no result ($resultFile). See the log: $logFile")
+        return $null
+    }
+    return Get-Content -LiteralPath $resultFile -Raw -Encoding UTF8 | ConvertFrom-Json
+}
 
 # --- Mannequin: copy from the engine -------------------------------------------------------------
 $sourceRoot = Get-EudoriaEnginePath $manifest.mannequin.source
@@ -111,24 +133,40 @@ foreach ($asset in $fab) {
 $oversized = @(Get-ChildItem -LiteralPath (Join-Path $script:RepoRoot 'unreal\Content') -Recurse -File -Filter '*_8K_*')
 foreach ($file in $oversized) { $problems.Add("8K texture found: $($file.FullName)") }
 
+# --- The test map ----------------------------------------------------------------------------------
+$renderTestFolder = Join-Path $script:RepoRoot 'unreal\Content\RenderTest'
+if ($BuildMap) {
+    if ($problems.Count -gt 0) {
+        $problems.Add('Test map not built: the content above is incomplete.')
+    } else {
+        # The whole folder is generated (map + floor material) and out of git: start from nothing. The
+        # editor cannot replace a map that is already on disk (UE 5.8: "an asset already exists").
+        Assert-EudoriaEditorClosed
+        if (Test-Path -LiteralPath $renderTestFolder) { Remove-Item -LiteralPath $renderTestFolder -Recurse -Force }
+        Write-Host 'Building the test map (headless, a few minutes)...'
+        $build = Invoke-EudoriaEditorPython 'build_render_test_map.py' 'build-map.json'
+        $failed = (-not $build) -or @($build.errors).Count -gt 0
+        if ($build) {
+            $counts = ($build.counts.PSObject.Properties | ForEach-Object { "$($_.Name) $($_.Value)" }) -join ', '
+            Write-Host "Test map: $($build.map) (seed $($build.seed)): $counts"
+            foreach ($buildError in @($build.errors)) { $problems.Add("Test map: $buildError") }
+        }
+        # A half-built scene must never pass for the test scene.
+        if ($failed -and (Test-Path -LiteralPath $renderTestFolder)) { Remove-Item -LiteralPath $renderTestFolder -Recurse -Force }
+    }
+}
+$mapFile = Join-Path $renderTestFolder 'L_RenderTest.umap'
+if (Test-Path -LiteralPath $mapFile) {
+    Write-Host ("Test map present ({0})" -f (Format-Size (Get-Item -LiteralPath $mapFile).Length))
+} else {
+    $problems.Add('Test map missing: run .\tools\dev\setup-render-test.ps1 -BuildMap (editor closed).')
+}
+
 # --- Optional: missing references, asked to the editor -------------------------------------------
 if ($VerifyReferences) {
-    Assert-EudoriaEditorClosed
-    $editorCmd = Get-EudoriaEnginePath 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-    # Forward slashes: the editor's command line reads "\r", "\n"... in a path as escape sequences.
-    $script = (Join-Path $script:RepoRoot 'unreal\Scripts\check_render_test_content.py') -replace '\\', '/'
-    $resultFile = Join-Path $script:RepoRoot 'unreal\Saved\RenderTest\content-check.json'
-    $logFile = Join-Path $script:RepoRoot 'unreal\Saved\Logs\EudoriaRenderTestContent.log'
-    if (Test-Path -LiteralPath $resultFile) { Remove-Item -LiteralPath $resultFile -Force }
-
     Write-Host 'Asking the editor for missing references (headless)...'
-    & $editorCmd $script:UProject '-run=pythonscript' "-script=$script" '-unattended' '-nullrhi' '-nosplash' `
-        '-nosound' '-nop4' "-abslog=$logFile" | Out-Null
-
-    if (-not (Test-Path -LiteralPath $resultFile)) {
-        $problems.Add("The reference check produced no result ($resultFile). See the log: $logFile")
-    } else {
-        $check = Get-Content -LiteralPath $resultFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $check = Invoke-EudoriaEditorPython 'check_render_test_content.py' 'content-check.json'
+    if ($check) {
         Write-Host ("References: {0} packages checked, {1} hard and {2} soft references missing" -f `
             $check.checkedPackages, @($check.missingHard).Count, @($check.missingSoft).Count)
         foreach ($entry in @($check.missingHard)) { $problems.Add("Missing hard reference: $($entry.asset) -> $($entry.missing)") }
