@@ -92,6 +92,10 @@ TestResults/
 *.trx
 coverage*/
 
+# --- Python bytecode (editor scripts in unreal/Scripts import each other) ---
+__pycache__/
+*.pyc
+
 # --- Logs ---
 logs/
 *.log

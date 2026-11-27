@@ -4,8 +4,12 @@ Run by tools/dev/setup-render-test.ps1 -BuildMap through the editor's "pythonscr
 closed). The map is rebuilt from scratch each time, always the same: every random choice comes from a
 fixed seed. It is NOT versioned (decision D2): it depends on the Fab content, which is out of git too.
 
-Scene: a Nordic forest clearing of about 100 m x 100 m, daylight, against a granite cliff (light bounces
-for Lumen); every Fab mesh is Nanite. Five tagged points (Eudoria.Benchmark.1 to 5) are the viewpoints
+Scene: a Nordic forest clearing of about 67 m x 61 m, daylight, against a granite cliff (light bounces
+for Lumen); every Fab mesh is Nanite.
+
+Open scans (fab_mesh_geometry.py) are never seen through their hole: open underneath -> rim buried, no
+tilt; open on one side -> only along an invisible wall of the play area, their back against it (the
+walls stop the player and the camera); closed meshes and two-sided leaves go anywhere. Five tagged points (Eudoria.Benchmark.1 to 5) are the viewpoints
 of the render benchmark (part C). Result in Saved/RenderTest/build-map.json.
 """
 
@@ -13,8 +17,12 @@ import json
 import math
 import os
 import random
+import sys
 
 import unreal
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fab_mesh_geometry as geometry  # noqa: E402
 
 MAP_PATH = "/Game/RenderTest/L_RenderTest"
 FLOOR_MATERIAL_PATH = "/Game/RenderTest/MI_RenderTest_Floor"
@@ -49,7 +57,13 @@ BENCHMARK_POINTS = [
     (unreal.Vector(700.0, -300.0, 170.0), (-20.0, 215.0)),  # 5. close-up on rocks, ferns and debris (Nanite detail)
 ]
 CLEAR_RADIUS = 450.0  # around the player start and the benchmark points
-CLEARING_CENTER = (0.0, 0.0)
+
+# Where the player can go (min_x, max_x, min_y, max_y), cm. North: the cliff, whose two ends go past the
+# west and east walls. Invisible walls stop the player and the camera at the edges.
+PLAY_AREA = (-3200.0, 3500.0, -4000.0, 2100.0)
+WALL_HEIGHT = 1500.0
+INTO_WALL = 20.0     # an open-side mesh's back goes this far into the wall: no gap to look through
+BURY_MARGIN = 3.0    # an open-bottom mesh's rim ends this far under the ground
 
 
 class Builder:
@@ -60,6 +74,8 @@ class Builder:
         self.counts = {}
         self.errors = []
         self.mesh_cache = {}
+        self.geometry = {}
+        self.kinds = {}
 
     def mesh(self, path):
         if path not in self.mesh_cache:
@@ -68,6 +84,14 @@ class Builder:
                 self.errors.append("missing mesh " + path)
             self.mesh_cache[path] = loaded
         return self.mesh_cache[path]
+
+    def info(self, path):
+        """Geometry of a mesh (open or closed, where the hole is), measured once."""
+        if path not in self.geometry:
+            mesh = self.mesh(path)
+            self.geometry[path] = geometry.analyze(mesh) if mesh else {"kind": None}
+            self.kinds[path.rsplit("/", 1)[-1]] = self.geometry[path].get("kind")
+        return self.geometry[path]
 
     def spawn_mesh(self, folder, path, location, rotation, scale=1.0, material=None):
         mesh = self.mesh(path)
@@ -92,12 +116,16 @@ class Builder:
                 return False
         return True
 
-    def scatter(self, folder, paths, count, radius, area, scale_range, z=0.0, keep_clear=True, sink=0.0, face_center=False):
+    def scatter(self, folder, paths, count, radius, area, scale_range, keep_clear=True, sink=0.0):
         """Places count props at random (fixed seed) in area = (min_x, max_x, min_y, max_y).
 
-        face_center: for "open" Megascans meshes (scanned from one side only, invisible from behind),
-        turn their scanned side (local +Y, as checked on the granite cliff) towards the clearing.
+        Refuses open-side meshes (see along_wall). Open-bottom meshes stand upright, rim buried.
+        sink: extra burying (cm, before scale), for the look.
         """
+        for path in paths:
+            if self.info(path).get("kind") == geometry.OPEN_SIDE:
+                self.errors.append(f"{folder}: {path} is open on one side, it can only go along a wall")
+                return
         placed = 0
         for _ in range(count * 30):
             if placed >= count:
@@ -108,18 +136,85 @@ class Builder:
             if keep_clear and not self.is_clear(x, y, radius * scale):
                 continue
             path = paths[self.rng.randrange(len(paths))]
-            if face_center:
-                towards_center = math.degrees(math.atan2(CLEARING_CENTER[1] - y, CLEARING_CENTER[0] - x))
-                yaw = towards_center - 90.0 + self.rng.uniform(-30.0, 30.0)
+            info = self.info(path)
+            yaw = self.rng.uniform(0.0, 360.0)
+            if info.get("kind") == geometry.OPEN_BOTTOM:
+                rotation = unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw)
+                z = -(max(0.0, info["boundaryTopZ"]) * scale + BURY_MARGIN) - sink * scale
             else:
-                yaw = self.rng.uniform(0.0, 360.0)
-            rotation = unreal.Rotator(roll=self.rng.uniform(-4.0, 4.0), pitch=self.rng.uniform(-4.0, 4.0), yaw=yaw)
-            self.spawn_mesh(folder, path, unreal.Vector(x, y, z - sink * scale), rotation, scale)
+                rotation = unreal.Rotator(roll=self.rng.uniform(-4.0, 4.0), pitch=self.rng.uniform(-4.0, 4.0), yaw=yaw)
+                z = -sink * scale
+            self.spawn_mesh(folder, path, unreal.Vector(x, y, z), rotation, scale)
             if keep_clear:
                 self.placed.append((x, y, radius * scale))
             placed += 1
         if placed < count:
             self.errors.append(f"{folder}: only {placed} of {count} placed")
+
+    def along_wall(self, folder, paths, wall, scale_range, gap_range):
+        """Lines open-side meshes up along one wall, scanned side towards the play area, back in the wall.
+
+        The hole of these scans is on their local -Y side (measured: fab_mesh_geometry.analyze).
+        """
+        min_x, max_x, min_y, max_y = PLAY_AREA
+        if wall == "south":
+            start, end, inward = (min_x, min_y), (max_x, min_y), (0.0, 1.0)
+        elif wall == "west":
+            start, end, inward = (min_x, min_y), (min_x, max_y - 600.0), (1.0, 0.0)
+        else:
+            start, end, inward = (max_x, min_y), (max_x, max_y - 600.0), (-1.0, 0.0)
+        length = math.hypot(end[0] - start[0], end[1] - start[1])
+        along = ((end[0] - start[0]) / length, (end[1] - start[1]) / length)
+        yaw = math.degrees(math.atan2(inward[1], inward[0])) - 90.0  # local +Y -> inward
+        # Local +X of the mesh, once turned: needed to shift its bounds centre onto the slot.
+        local_x = (math.cos(math.radians(yaw)), math.sin(math.radians(yaw)))
+
+        position = self.rng.uniform(*gap_range)
+        while True:
+            path = paths[self.rng.randrange(len(paths))]
+            info = self.info(path)
+            if info.get("kind") != geometry.OPEN_SIDE:
+                self.errors.append(f"{folder}: {path} is not open on one side, no need for a wall")
+                return
+            scale = self.rng.uniform(*scale_range)
+            center_x, center_y, _ = info["boundsCenter"]
+            extent_x, extent_y, _ = info["boundsExtent"]
+            half_width = extent_x * scale
+            if position + 2.0 * half_width > length:
+                break
+            middle = position + half_width
+            # Back of the mesh (local y = center - extent) INTO_WALL behind the wall line.
+            depth = -(center_y - extent_y) * scale - INTO_WALL
+            x = start[0] + along[0] * middle + inward[0] * depth - local_x[0] * center_x * scale
+            y = start[1] + along[1] * middle + inward[1] * depth - local_x[1] * center_x * scale
+            if self.is_clear(x, y, half_width):
+                actor = self.spawn_mesh(folder, path, unreal.Vector(x, y, -10.0 * scale), unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw), scale)
+                if actor:
+                    self.placed.append((x, y, half_width))
+            position = middle + half_width + self.rng.uniform(*gap_range)
+
+    def walls(self):
+        """Invisible walls around PLAY_AREA: they block the player and the camera, cast no shadow."""
+        min_x, max_x, min_y, max_y = PLAY_AREA
+        thickness = 100.0
+        sides = [
+            ((min_x + max_x) / 2.0, min_y - thickness / 2.0, max_x - min_x + 2 * thickness, thickness),
+            ((min_x + max_x) / 2.0, max_y + thickness / 2.0, max_x - min_x + 2 * thickness, thickness),
+            (min_x - thickness / 2.0, (min_y + max_y) / 2.0, thickness, max_y - min_y),
+            (max_x + thickness / 2.0, (min_y + max_y) / 2.0, thickness, max_y - min_y),
+        ]
+        cube = unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Cube")
+        for x, y, size_x, size_y in sides:
+            actor = self.actors.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(x, y, WALL_HEIGHT / 2.0), unreal.Rotator())
+            component = actor.static_mesh_component
+            component.set_static_mesh(cube)
+            component.set_cast_shadow(False)
+            component.set_editor_property("affect_distance_field_lighting", False)
+            component.set_collision_profile_name("BlockAll")
+            actor.set_actor_scale3d(unreal.Vector(size_x / 100.0, size_y / 100.0, WALL_HEIGHT / 100.0))
+            actor.set_actor_hidden_in_game(True)
+            actor.set_folder_path("Bounds")
+            self.counts["Bounds"] = self.counts.get("Bounds", 0) + 1
 
 
 def spawn(cls, location, rotation, folder):
@@ -184,29 +279,31 @@ def build():
             yaw = b.rng.choice([0.0, 180.0]) + b.rng.uniform(-6.0, 6.0)
             b.spawn_mesh("Ground", MESHES["ground"], unreal.Vector(x, y, -2.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw))
 
-    # --- The cliff: three pieces to the north, the middle one leaning over the clearing ------------
+    # --- The cliff: three pieces to the north, ends past the west and east walls -------------------
     # The cliff is an open mesh scanned on its local +Y side: yaw about 180 turns that side south,
     # towards the clearing (checked on screen on 2026-11-27: at yaw 0 only its back faced the clearing,
     # and the back of an open mesh is not drawn).
     b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(-2400.0, 3000.0, -100.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=188.0), 1.0)
-    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(400.0, 2650.0, -150.0), unreal.Rotator(roll=14.0, pitch=0.0, yaw=176.0), 1.15)
+    b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(400.0, 2650.0, -150.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=176.0), 1.15)
     b.spawn_mesh("Cliff", MESHES["cliff"], unreal.Vector(3100.0, 3100.0, -100.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=160.0), 1.0)
-    for x, y in ((-2400.0, 3000.0), (400.0, 2650.0), (3100.0, 3100.0)):
-        b.placed.append((x, y, 1500.0))
+    if b.info(MESHES["cliff"]).get("kind") != geometry.OPEN_SIDE:
+        b.errors.append("cliff: expected open on one side, measured " + str(b.info(MESHES["cliff"]).get("kind")))
+    b.walls()
 
     # --- Props (fixed seed) ----------------------------------------------------------------------
-    clearing = (-4500.0, 4500.0, -4500.0, 2300.0)
-    b.scatter("Rocks", [MESHES["rock_face"]], 8, 180.0, clearing, (1.0, 1.6), sink=20.0, face_center=True)
-    b.scatter("Rocks", [MESHES["rock_formation"]], 12, 170.0, clearing, (0.9, 1.5), sink=15.0)
+    min_x, max_x, min_y, max_y = PLAY_AREA
+    clearing = (min_x + 400.0, max_x - 400.0, min_y + 400.0, max_y - 700.0)  # cliff foot excluded
+    walled = [MESHES["rock_face"], MESHES["ledge_rock"], MESHES["roots"]]
+    for wall in ("south", "west", "east"):
+        b.along_wall("Rocks", walled, wall, (0.9, 1.3), (150.0, 700.0))
+    b.scatter("Rocks", [MESHES["rock_formation"]], 12, 170.0, clearing, (0.9, 1.5))
     b.scatter("Rocks", [MESHES["boulder"]], 16, 100.0, clearing, (0.8, 1.4), sink=15.0)
-    b.scatter("Rocks", [MESHES["ledge_rock"]], 10, 170.0, clearing, (0.9, 1.4), sink=10.0, face_center=True)
-    b.scatter("Rocks", [MESHES["cluster"]], 30, 110.0, clearing, (0.8, 1.3), sink=10.0)
-    b.scatter("Wood", [MESHES["roots"]], 6, 400.0, clearing, (0.9, 1.2), sink=10.0, face_center=True)
+    b.scatter("Rocks", [MESHES["cluster"]], 30, 110.0, clearing, (0.8, 1.3))
     b.scatter("Wood", [MESHES["log"]], 10, 280.0, clearing, (0.9, 1.2))
-    b.scatter("Wood", [MESHES["stump"]], 12, 70.0, clearing, (0.9, 1.3), sink=5.0)
+    b.scatter("Wood", [MESHES["stump"]], 12, 70.0, clearing, (0.9, 1.3))
     # Small things: allowed close to each other, still away from the viewpoints' feet.
     b.scatter("Plants", FERNS, 260, 0.0, clearing, (0.8, 1.5), keep_clear=False)
-    b.scatter("Debris", DEBRIS, 160, 0.0, (-3000.0, 3000.0, -3000.0, 2000.0), (1.0, 2.5), keep_clear=False)
+    b.scatter("Debris", DEBRIS, 160, 0.0, clearing, (1.0, 2.5), keep_clear=False)
 
     # --- Player start and benchmark viewpoints ---------------------------------------------------
     spawn(unreal.PlayerStart, PLAYER_START, unreal.Rotator(roll=0.0, pitch=0.0, yaw=90.0), "Gameplay")
@@ -227,6 +324,7 @@ def build():
         b.errors.append("save_current_level failed")
 
     result["counts"] = b.counts
+    result["kinds"] = b.kinds
     result["errors"] = b.errors
     return result
 
