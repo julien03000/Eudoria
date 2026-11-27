@@ -2,7 +2,7 @@
 
 > À mettre à jour à la fin de chaque session.
 
-**Dernière mise à jour :** 2026-11-27 (sous-étape 1.6 ✅ validée ; `start-db.ps1` corrigé)
+**Dernière mise à jour :** 2026-11-27 (sous-étape 1.6 ✅ validée ; `start-db.ps1` corrigé ; plan de la 1.7 soumis au porteur)
 **Étape en cours :** Étape 1 — Identité numérique (branche `etape-01-identite`)
 **Phase 0 :** 🟢 validée par le porteur le 2026-11-24 (sur `main`).
 
@@ -35,6 +35,12 @@
 
 ## 🟡 En cours
 - Étape 1 démarrée sur `etape-01-identite`.
+- **Plan de la sous-étape 1.7 — Test de rendu rédigé le 2026-11-27, ⏸️ en attente de l'accord du porteur**
+  (`docs/plans/etape-01-7.md`, 8 décisions au § 11). Constats : plugin Fab **pas réellement installé** (enregistré vers
+  C:, dossier absent) ; **bug signalé** sur le forum d'Epic (Fab 0.0.22 + UE 5.8.4 du lanceur → compilation C++ cassée,
+  `FabToolset`) → vérifié en premier, replis prévus ; Megascans redevenus gratuits sur Fab (05/11/2026, sources
+  secondaires, licence à lire sur chaque fiche) ; RX 9060 XT **16 Go** ; le mannequin du moteur contient des Blueprints
+  avec logique (`ABP_Unarmed`, Control Rig) → animation proposée en C++.
 - **`start-db.ps1` corrigé (2026-11-27)** : lancé avec sa sortie redirigée (`*>`), il échouait sur le message normal de
   Docker « Container … Running » (PowerShell 5.1 change chaque ligne de stderr en erreur). La sortie de Docker est
   désormais convertie en texte, et seul le code de retour décide de l'échec. Vérifié à la main (pas de suite de tests
@@ -245,7 +251,7 @@
   avertissement, et signale un avertissement C4864 dans un en-tête **du moteur** (`Misc/Attribute.h`), pas dans notre
   code. Rien à faire tant que ça compile ; installer MSVC 14.50 serait une installation (accord du porteur requis).
 - Plugin Fab 5.8 enregistré par le lanceur dans un dossier inexistant (`C:\Program Files\Epic Games\UE_5.8`) : à
-  réinstaller sur le moteur de E: avant la 1.7.
+  réinstaller sur le moteur de E: au début de la 1.7 (plan § 4 ; attention au bug `FabToolset`, § 4.3).
 - La limite mémoire WSL (4 Go) s'applique aussi à la distribution Ubuntu déjà présente sur le PC.
 - Unreal 5.9 est en Preview (2026-11-09) ; on reste sur 5.8.x.
 
@@ -256,5 +262,7 @@
 - *À surveiller :* Docker Desktop s'est figé une fois en mode « économie de ressources » (2026-11-26) ; s'il se
   reproduit, envisager de désactiver ce mode dans ses réglages (décision du porteur).
 
-1. **Claude : rédiger le plan de la sous-étape 1.7 — Test de rendu** (`docs/plans/etape-01-7.md`) et le soumettre au
-   porteur. Prérequis connu : réinstaller le plugin Fab sur le moteur de E: (voir « Problèmes connus »).
+1. **Porteur : relire le plan de la 1.7** (`docs/plans/etape-01-7.md`), trancher les décisions D1 à D8 (§ 11) et
+   donner son « OK ».
+2. **Claude, après cet OK :** partie A — guider M1 (réinstallation du plugin Fab), puis **recompiler aussitôt** pour
+   détecter le bug `FabToolset` (§ 4.3), puis cache sur E: et tableau des assets à valider (§ 5.1).
