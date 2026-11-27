@@ -91,6 +91,8 @@ C'est la première brique du **noyau** : tout le reste (avatar, inventaire, éco
    **Nanite** activés et quelques assets photoréalistes **gratuits de Fab** (licence vérifiée pour chaque asset,
    cache de Fab redirigé vers E:, taille ajoutée à Git LFS surveillée). But : mesurer les performances réelles
    sur le poste du porteur (images/s, mémoire vidéo, RAM) et **valider l'ADR-0003**.
+   Une **seconde campagne identique** (même scène, même parcours) sera faite après le passage à 32 Go de RAM, pour
+   comparer (`docs/perf/`).
 
 ### Critères de validation
 - [x] Je peux créer un compte depuis le client Unreal sur PC, puis me connecter avec. *(1.5, test réel T4 du porteur le 2026-11-25)*
@@ -131,6 +133,11 @@ personnalisation possible **par le joueur, dans le jeu** (et pas seulement dans 
 coût en performances avec plusieurs avatars à l'écran, déclinaison VR/mobile (niveaux de détail bas),
 taille des assets (impact sur le quota Git LFS, ADR-0005), conditions de licence ; et, si MetaHuman ne
 convient pas, alternatives.
+**Point ouvert à trancher dans cette évaluation (ajouté par le porteur le 2026-11-27, ADR-0003 « Points ouverts ») :**
+les Animation Blueprints et Control Rig sont l'outil standard pour un avatar réaliste (transitions, IK des pieds,
+visage). La règle « aucune logique Blueprint » devra être précisée pour eux (ex. logique dans une classe C++
+`AnimInstance`, graphe d'animation autorisé), avec une **décision du porteur à l'étape 2**. (En 1.7, la scène de test
+anime le personnage en C++, sans graphe ni IK.)
 **Livrable :** éditeur d'avatar dans le client Unreal (apparence de base, couleurs, quelques vêtements) ; les paramètres de l'avatar sont stockés par le noyau et rattachés au compte.
 **Validation :** l'ADR avatar est validé ; je personnalise mon avatar, je me reconnecte depuis un autre poste, je retrouve exactement le même avatar.
 **Idée future (à décider au démarrage de l'étape, choix du porteur du 2026-11-24) :** un **« nom d'affichage » libre**

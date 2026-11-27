@@ -123,3 +123,15 @@ Epic ne publie pas de chiffres officiels par option, et les témoignages montren
 - Le `.gitignore` et le `.gitattributes` sont adaptés à Unreal (ADR-0005).
 - Le cache de données dérivées d'Unreal (DerivedDataCache, Zen) s'écrit **par défaut sur C:** (`%LOCALAPPDATA%\UnrealEngine\Common`, déjà 1,9 Go). Il faudra le **déplacer vers E:** au début de l'étape 1 (simple réglage, pas d'installation), conformément à la règle « tout sur E: ».
 - Mise à jour de la section « Stack technique » de `CLAUDE.md` après validation.
+
+## Points ouverts
+
+- **Animation des avatars et règle « aucune logique Blueprint »** *(ajouté le 2026-11-27, à la demande du porteur,
+  plan 1.7 décision D3)* : les **Animation Blueprints** et les **Control Rig** sont l'outil standard d'Unreal pour un
+  avatar réaliste (transitions entre animations, ajustement des pieds au sol (IK), visage). La règle 2 (« pas de logique
+  dans les graphes Blueprint ») devra être **précisée pour eux** — par exemple : toute la logique dans une classe C++
+  dérivée d'`AnimInstance`, et le graphe d'animation autorisé pour le seul assemblage des poses. **Décision du porteur
+  à l'étape 2** (évaluation de MetaHuman). D'ici là, la scène de test de la 1.7 anime le personnage en C++
+  (mode « nœud unique », sans graphe ni IK).
+- **Validation sur le poste du porteur** : mesures de la sous-étape 1.7 (`docs/perf/`), à ajouter ici une fois faites ;
+  seconde campagne identique prévue après le passage à 32 Go de RAM.

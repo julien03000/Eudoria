@@ -1,7 +1,7 @@
 # Étape 1.7 — Test de rendu : scène après connexion, Lumen + Nanite, mesures sur le poste
 
-> Statut : **⏸️ plan proposé le 2026-11-27, en attente de l'accord du porteur.**
-> Rien n'est codé ni installé tant que les décisions du § 11 ne sont pas prises.
+> Statut : **✅ plan validé par le porteur le 2026-11-27** (D1 à D8 = recommandations, avec les deux compléments du
+> § 11.1). Partie A en cours.
 
 ## 1. Vérifications faites avant d'écrire ce plan (2026-11-27)
 
@@ -238,6 +238,17 @@ Je fais tout le reste : scripts, code, carte, empaquetage, analyse des mesures, 
 | D6 | Mesurer aussi le Lumen matériel ? | **Oui**, en passage supplémentaire |
 | D7 | Mesures dans une version empaquetée Development (sur E:) ? | **Oui** |
 | D8 | Touches : ZQSD + flèches + manette ? | **Oui** |
+
+### 11.1 Décisions du porteur (2026-11-27)
+D1 à D8 : **recommandations retenues**. Deux compléments :
+1. **D3** : animation en C++ « nœud unique » acceptée **pour ce test** ; point ouvert ajouté à l'ADR-0003 et à la
+   ROADMAP (étape 2, évaluation de MetaHuman) : les Animation Blueprints et Control Rig sont l'outil standard d'un
+   avatar réaliste ; la règle « aucune logique Blueprint » sera précisée pour eux, avec une décision du porteur à
+   l'étape 2.
+2. **Mesures** : campagne 1 avec **16 Go** comme prévu ; **campagne 2 identique** (même scène, même parcours, mêmes
+   niveaux) **après le passage à 32 Go**, pour comparer. Les deux sont décrites dans `docs/perf/README.md` ; le
+   parcours et les scripts de mesure doivent donc rester **rejouables tels quels** (version de la carte et du parcours
+   notée dans chaque résultat).
 
 ## 12. Risques
 - **Bug Fab / compilation C++** (§ 4.3) : vérifié en tout premier, replis prévus.
